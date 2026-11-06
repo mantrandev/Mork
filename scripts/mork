@@ -1,0 +1,39 @@
+#!/bin/bash
+set -euo pipefail
+
+BUNDLE_ID="${MORK_BUNDLE_ID:-dev.mantrandev.mork}"
+
+usage() {
+    cat <<USAGE
+Usage: mork [folder]
+
+Open a Git repository in Mork.
+
+  mork            open the repository of the current folder
+  mork <folder>   open the repository that contains <folder>
+  mork <file>     open the repository that contains <file>
+USAGE
+}
+
+case "${1:-}" in
+    -h|--help) usage; exit 0 ;;
+esac
+
+if [ "$#" -gt 1 ]; then
+    usage >&2
+    exit 64
+fi
+
+target="${1:-.}"
+
+if [ ! -e "$target" ]; then
+    echo "mork: $target: no such file or folder" >&2
+    exit 66
+fi
+
+if [ ! -d "$target" ]; then
+    target="$(dirname "$target")"
+fi
+
+folder="$(cd "$target" && pwd -P)"
+open -b "$BUNDLE_ID" "$folder"

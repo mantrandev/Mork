@@ -1,0 +1,139 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Mork: learn Git as you use it</title>
+<meta name="description" content="A native Git client for macOS. Click as usual. Mork shows the real git command, its output and a short lesson.">
+<meta property="og:title" content="Mork: learn Git as you use it">
+<meta property="og:description" content="A native Git client for macOS. Click as usual. Mork shows the real git command, its output and a short lesson.">
+<meta property="og:type" content="website">
+<meta property="og:url" content="https://mantrandev.github.io/Mork/">
+<meta property="og:image" content="https://mantrandev.github.io/Mork/images/social-card.png">
+<meta property="og:image:width" content="1280">
+<meta property="og:image:height" content="640">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="Mork: learn Git as you use it">
+<meta name="twitter:description" content="A native Git client for macOS. Click as usual. Mork shows the real git command, its output and a short lesson.">
+<meta name="twitter:image" content="https://mantrandev.github.io/Mork/images/social-card.png">
+<link rel="canonical" href="https://mantrandev.github.io/Mork/">
+<link rel="icon" href="images/icon.png">
+<style>
+:root {
+  --night: #0b1020;
+  --panel: #151c31;
+  --line: #2a3652;
+  --text: #f4f6fb;
+  --muted: #a9b6d3;
+  --indigo: #8fa3cc;
+  --mint: #3dd6a8;
+}
+* { box-sizing: border-box; }
+html { scroll-behavior: smooth; }
+body {
+  margin: 0;
+  background: var(--night);
+  color: var(--text);
+  font: 17px/1.6 -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", Roboto, sans-serif;
+}
+.wrap { width: min(1120px, 100% - 40px); margin: 0 auto; }
+nav { display: flex; align-items: center; justify-content: space-between; padding: 20px 0; }
+.brand { display: flex; align-items: center; gap: 10px; color: var(--text); font-weight: 650; text-decoration: none; }
+.brand img { width: 32px; height: 32px; }
+nav a.link { color: var(--muted); text-decoration: none; }
+nav a.link:hover { color: var(--text); }
+.hero { text-align: center; padding: 56px 0 40px; }
+.hero img.icon { width: 112px; height: 112px; }
+h1 { margin: 16px 0 12px; font-size: clamp(36px, 6vw, 60px); line-height: 1.08; letter-spacing: -0.02em; }
+.lead { max-width: 620px; margin: 0 auto 28px; color: var(--muted); font-size: 20px; }
+.actions { display: flex; flex-wrap: wrap; justify-content: center; gap: 12px; }
+.button { padding: 12px 22px; border: 1px solid var(--line); border-radius: 10px; color: var(--text); font-weight: 600; text-decoration: none; }
+.button:hover { border-color: var(--indigo); }
+.button.primary { border-color: var(--mint); background: var(--mint); color: #06281f; }
+.button.primary:hover { background: #6fe8c4; border-color: #6fe8c4; }
+.note { margin-top: 14px; color: var(--muted); font-size: 14px; }
+.shot { display: block; width: 100%; height: auto; border-radius: 12px; }
+section { padding: 56px 0; }
+h2 { margin: 0 0 12px; font-size: clamp(26px, 4vw, 36px); line-height: 1.15; letter-spacing: -0.01em; }
+section > .wrap > p { max-width: 640px; margin: 0 0 28px; color: var(--muted); }
+.grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 16px; }
+.card { padding: 22px; border: 1px solid var(--line); border-radius: 12px; background: var(--panel); }
+.card h3 { margin: 0 0 6px; font-size: 18px; }
+.card p { margin: 0; color: var(--muted); font-size: 16px; }
+code { color: var(--mint); font: 15px ui-monospace, "SF Mono", Menlo, monospace; }
+footer { padding: 32px 0 48px; border-top: 1px solid var(--line); color: var(--muted); font-size: 14px; }
+footer a { color: var(--text); }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <nav>
+    <a class="brand" href="#"><img src="images/icon.png" alt="">Mork</a>
+    <a class="link" href="https://github.com/mantrandev/Mork">GitHub</a>
+  </nav>
+  <header class="hero">
+    <img class="icon" src="images/icon.png" alt="Mork icon">
+    <h1>Learn Git as you use it</h1>
+    <p class="lead">Mork is a native Git client for macOS. Click as usual, and see the real <code>git</code> command, its output and a short lesson.</p>
+    <div class="actions">
+      <a class="button primary" href="https://github.com/mantrandev/Mork/releases/latest/download/Mork.zip">Download for Mac</a>
+      <a class="button" href="https://github.com/mantrandev/Mork">View source</a>
+      <a class="button" href="https://www.paypal.com/donate/?business=tranman131%40gmail.com&amp;currency_code=USD">Buy me a coffee</a>
+    </div>
+    <p class="note">macOS 14 or later, Apple silicon.</p>
+  </header>
+  <img class="shot" src="images/hero-changes.png" width="2560" height="1600" alt="Local Changes in dark mode, with a diff, the commit form and the Git Console">
+</div>
+
+<section>
+  <div class="wrap">
+    <h2>Why Mork</h2>
+    <p>Most Git apps hide Git. Mork shows it, so you learn while you work.</p>
+    <div class="grid">
+      <div class="card"><h3>Learn by doing</h3><p>Every click runs plain <code>git</code>. The Git Console shows the command, the result and what each flag means.</p></div>
+      <div class="card"><h3>Nothing hidden</h3><p>Mork has no Git engine of its own. You can repeat every action in a terminal.</p></div>
+      <div class="card"><h3>See before you run</h3><p>Dialogs show the exact command their button will run.</p></div>
+      <div class="card"><h3>Fast on big repositories</h3><p>Mork opens 50,000 commits in under a second.</p></div>
+    </div>
+  </div>
+</section>
+
+<section>
+  <div class="wrap">
+    <h2>See your whole history</h2>
+    <p>Browse the commit graph, search commits, and see file history, line history, blame and reflog.</p>
+    <img class="shot" src="images/hero-history.png" width="2560" height="1600" loading="lazy" alt="All Commits in light mode, with the commit graph, branch labels and commit details">
+  </div>
+</section>
+
+<section>
+  <div class="wrap">
+    <h2>Fix conflicts in the app</h2>
+    <p>Pick a side for each block, or edit the result yourself. Mork chooses the layout for you.</p>
+    <img class="shot" src="images/conflict-3way.png" width="2448" height="1530" loading="lazy" alt="Conflict window with Ours, Base and Theirs above the editable result">
+  </div>
+</section>
+
+<section>
+  <div class="wrap">
+    <h2>Everything you do in Git</h2>
+    <p>From your first commit to interactive rebase.</p>
+    <div class="grid">
+      <div class="card"><h3>Changes</h3><p>Stage or discard a file, hunk or single line. Commit, amend and sign.</p></div>
+      <div class="card"><h3>Branches</h3><p>Merge, rebase, cherry-pick, revert and reset. Squash with interactive rebase.</p></div>
+      <div class="card"><h3>Remotes and tags</h3><p>Fetch, pull and push. Create, push and delete tags.</p></div>
+      <div class="card"><h3>Tabs and workspaces</h3><p>Open several windows and tabs. Save sets of tabs as workspaces.</p></div>
+      <div class="card"><h3>Tools</h3><p>Bisect, statistics, Git Flow, Git LFS, custom commands and a built-in terminal.</p></div>
+      <div class="card"><h3>Accounts</h3><p>Keep GitHub, GitLab, Bitbucket and Gitea tokens in the Keychain. Manage SSH keys.</p></div>
+    </div>
+  </div>
+</section>
+
+<footer>
+  <div class="wrap">
+    <p>Mork is free. If it helps you, <a href="https://www.paypal.com/donate/?business=tranman131%40gmail.com&amp;currency_code=USD">buy me a coffee on PayPal</a>.</p>
+    <p>Mork is free for noncommercial use and for internal work at a company. It is source-available under the <a href="https://github.com/mantrandev/Mork/blob/main/LICENSE">PolyForm Noncommercial License</a> with an added permission. You cannot sell it or put it in a commercial product.</p>
+  </div>
+</footer>
+</body>
+</html>

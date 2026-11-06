@@ -1,0 +1,56 @@
+name: Mork
+options:
+  bundleIdPrefix: dev.mantrandev
+  deploymentTarget:
+    macOS: "14.0"
+  createIntermediateGroups: true
+packages:
+  Mork:
+    path: .
+settings:
+  base:
+    SWIFT_VERSION: "6.0"
+    MACOSX_DEPLOYMENT_TARGET: "14.0"
+    CODE_SIGN_IDENTITY: "-"
+    CODE_SIGN_STYLE: Manual
+    DEVELOPMENT_TEAM: ""
+    ENABLE_HARDENED_RUNTIME: NO
+targets:
+  MorkApp:
+    type: application
+    platform: macOS
+    configFiles:
+      Debug: Config/Dev.xcconfig
+      Release: Config/Prod.xcconfig
+    sources:
+      - path: Sources/Mork
+      - path: Assets/AppIcon-DEV.icon
+        buildPhase: resources
+      - path: Assets/AppIcon.icon
+        buildPhase: resources
+    dependencies:
+      - package: Mork
+        product: MorkDomain
+      - package: Mork
+        product: MorkData
+      - package: Mork
+        product: MorkPresentation
+      - package: Mork
+        product: MorkTerminal
+    settings:
+      base:
+        PRODUCT_NAME: $(APP_DISPLAY_NAME)
+        PRODUCT_MODULE_NAME: MorkApp
+        GENERATE_INFOPLIST_FILE: YES
+        INFOPLIST_KEY_CFBundleDisplayName: $(APP_DISPLAY_NAME)
+        INFOPLIST_KEY_LSApplicationCategoryType: public.app-category.developer-tools
+        INFOPLIST_KEY_NSPrincipalClass: NSApplication
+        MARKETING_VERSION: 0.0.1
+        CURRENT_PROJECT_VERSION: 1
+schemes:
+  MorkApp:
+    build:
+      targets:
+        MorkApp: all
+    run:
+      config: Debug
