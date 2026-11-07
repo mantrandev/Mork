@@ -143,7 +143,7 @@ You can also drop a folder on Mork in the Dock.
 
 ## Support Mork
 
-Mork is free. If it helps you, you can [buy me a coffee on PayPal](https://www.paypal.com/donate/?business=tranman131%40gmail.com&currency_code=USD).
+Mork is free. If it helps you, you can [buy me some tokens on PayPal](https://www.paypal.com/donate/?business=tranman131%40gmail.com&currency_code=USD).
 
 ## License
 
