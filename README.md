@@ -68,7 +68,13 @@ Press Space on a conflicted file to open the larger window. Deleted and binary f
 **[Download Mork for macOS (Apple silicon)](https://github.com/mantrandev/Mork/releases/latest/download/Mork.zip)**. You need macOS 14 or later and `git`. See what changed in [CHANGELOG.md](CHANGELOG.md).
 
 1. Unzip `Mork.zip` and move `Mork.app` to `/Applications`.
-2. Mork is not notarized yet, so macOS blocks the first launch. Open it once, then click **Open Anyway** in System Settings ▸ Privacy & Security.
+2. Mork is not notarized yet, so macOS blocks the first launch. Run this once in Terminal, then open Mork:
+
+   ```bash
+   xattr -dr com.apple.quarantine /Applications/Mork.app
+   ```
+
+   Or open Mork once, then click **Open Anyway** in System Settings ▸ Privacy & Security.
 3. To use the `mork` command, open Settings ▸ General ▸ Command line tool and click Install.
 
 ## Build from source
