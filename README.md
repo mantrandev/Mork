@@ -141,6 +141,10 @@ You can also drop a folder on Mork in the Dock.
 | Preview a file | Space | Close preview | Space / Esc |
 | Stage or unstage selected files | Return | Discard selected files | ⇧⌘D |
 
+## Support Mork
+
+Mork is free. If it helps you, you can [buy me some tokens on PayPal](https://www.paypal.com/cgi-bin/webscr?cmd=_xclick&business=tranman131%40gmail.com&item_name=Tokens%20for%20Mork&currency_code=USD).
+
 ## License
 
 You can read, use, change and share Mork for noncommercial purposes. You can also use it for internal work at a company, including paid work. You cannot sell it, charge for access or put it in a commercial product.
