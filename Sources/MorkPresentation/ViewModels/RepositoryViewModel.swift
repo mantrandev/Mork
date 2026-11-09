@@ -292,6 +292,7 @@ public final class RepositoryViewModel {
     let dependencies: RepositoryDependencies
     let searchDebounce: Duration
     let sleep: @Sendable (Duration) async throws -> Void
+    let now: @Sendable () -> ContinuousClock.Instant
     @ObservationIgnored let explorationTasks = ExplorationTasks()
     @ObservationIgnored let autoFetch = AutoFetchState()
     @ObservationIgnored var lineAnchor: DiffLineID?
@@ -322,13 +323,15 @@ public final class RepositoryViewModel {
         dependencies: RepositoryDependencies,
         searchDebounce: Duration = .milliseconds(300),
         filterDebounce: Duration = .milliseconds(150),
-        sleep: @escaping @Sendable (Duration) async throws -> Void = { try await Task.sleep(for: $0) }
+        sleep: @escaping @Sendable (Duration) async throws -> Void = { try await Task.sleep(for: $0) },
+        now: @escaping @Sendable () -> ContinuousClock.Instant = { ContinuousClock.now }
     ) {
         self.url = url
         self.dependencies = dependencies
         self.searchDebounce = searchDebounce
         self.filterDebounce = filterDebounce
         self.sleep = sleep
+        self.now = now
         rangeChanges = CommitRangeChangesViewModel(loadChanges: dependencies.range.loadChanges, loadDiff: dependencies.range.loadDiff)
         sidebarOptions = dependencies.sidebarOptions.load.execute(repository: url)
         historyOptions = dependencies.exploration.loadHistoryOptions.execute(repository: url)
@@ -414,11 +417,13 @@ public final class RepositoryViewModel {
         } catch {
             if reportingErrors, !refreshRequested { errorMessage = error.localizedDescription }
         }
+        let isFirstLoad = !hasLoaded
         hasLoaded = true
         if isLoading { isLoading = false }
         reconcileSelection()
         advanceConflictWindow()
         reconcileSidebarItem()
+        if isFirstLoad, isAutoFetching, autoFetch.lastAttempt == nil { restartAutoFetch() }
         if pane == .reflog { await loadReflog() }
     }
 
@@ -779,6 +784,7 @@ public final class RepositoryViewModel {
     public func setAppActive(_ active: Bool) {
         guard isAppActive != active else { return }
         isAppActive = active
+        if active, isAutoFetching { restartAutoFetch() }
         guard active, changedWhileInactive else { return }
         changedWhileInactive = false
         Task { await refresh(reportingErrors: false) }

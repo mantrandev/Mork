@@ -44,19 +44,24 @@ extension RepositoryViewModel {
         await session.load()
     }
 
-    private func restartAutoFetch() {
+    func restartAutoFetch() {
         autoFetch.cancel()
         guard let interval = settings.autoFetch.duration else { return }
         let sleep = sleep
+        let firstWait = autoFetch.remaining(of: interval, at: now())
         autoFetch.task = Task { [weak self] in
+            var wait = firstWait
             while true {
-                do {
-                    try await sleep(interval)
-                } catch {
-                    return
+                if wait > .zero {
+                    do {
+                        try await sleep(wait)
+                    } catch {
+                        return
+                    }
                 }
                 guard !Task.isCancelled, let self else { return }
                 await self.fetchAutomatically()
+                wait = interval
             }
         }
     }
@@ -71,6 +76,7 @@ extension RepositoryViewModel {
                 failure = error
             }
         }
+        autoFetch.lastAttempt = now()
         guard let failure else {
             autoFetch.hasReportedFailure = false
             return
@@ -84,6 +90,12 @@ extension RepositoryViewModel {
 final class AutoFetchState {
     var task: Task<Void, Never>?
     var hasReportedFailure = false
+    var lastAttempt: ContinuousClock.Instant?
+
+    func remaining(of interval: Duration, at now: ContinuousClock.Instant) -> Duration {
+        guard let lastAttempt else { return .zero }
+        return max(.zero, interval - lastAttempt.duration(to: now))
+    }
 
     func cancel() {
         task?.cancel()
