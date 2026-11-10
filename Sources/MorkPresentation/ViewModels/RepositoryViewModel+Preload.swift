@@ -3,6 +3,7 @@ import Foundation
 
 extension RepositoryViewModel {
     public static let commitPreloadCapacity = 32
+    public static let commitPreloadByteBudget = 4 * 1024 * 1024
     public static let hoverPrefetchDelay: Duration = .milliseconds(80)
 
     public func prefetchCommit(_ commit: Commit) {
@@ -11,7 +12,7 @@ extension RepositoryViewModel {
     }
 
     private func needsDetailPrefetch(_ commit: Commit) -> Bool {
-        commitDetailsTab == .changes && preloader.detail(of: commit.hash, tabWidth: settings.diff.tabWidth) == nil
+        commitDetailsTab == .changes && !settings.diff.showsEntireFile && preloader.detail(of: commit.hash, tabWidth: settings.diff.tabWidth) == nil
     }
 
     public func endHover(_ commit: Commit) {

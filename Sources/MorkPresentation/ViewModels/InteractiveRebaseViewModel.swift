@@ -303,7 +303,7 @@ public final class InteractiveRebaseViewModel: Identifiable {
         rebuildCommitTabRows()
         track { [weak self] in
             let state = await changes.fullDiff(file, commit)
-            guard let self else { return }
+            guard let self, self.diffsByCommit[commit.hash] != nil else { return }
             self.diffsByCommit[commit.hash, default: [:]][file.path] = state
             self.rebuildCommitTabRows()
         }
@@ -317,6 +317,8 @@ public final class InteractiveRebaseViewModel: Identifiable {
 
     private func showSelectedCommit() {
         expanded = []
+        let selectedHash = selectedStep?.commit.hash
+        diffsByCommit = diffsByCommit.filter { $0.key == selectedHash }
         if let changes, let commit = selectedStep?.commit, filesByCommit[commit.hash] == nil {
             filesByCommit[commit.hash] = .loading
             track { [weak self] in
@@ -354,7 +356,7 @@ public final class InteractiveRebaseViewModel: Identifiable {
         for file in missing { diffsByCommit[commit.hash, default: [:]][file.path] = .loading }
         track { [weak self] in
             let states = await changes.diffs(missing, commit)
-            guard let self else { return }
+            guard let self, self.diffsByCommit[commit.hash] != nil else { return }
             self.diffsByCommit[commit.hash, default: [:]].merge(states) { _, new in new }
             self.rebuildCommitTabRows()
         }

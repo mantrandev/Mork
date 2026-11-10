@@ -11,6 +11,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     func applicationDidFinishLaunching(_ notification: Notification) {
         NSApp.setActivationPolicy(.regular)
         NSApp.activate()
+        MemoryPressureMonitor.shared.start()
     }
 
     func application(_ application: NSApplication, open urls: [URL]) {

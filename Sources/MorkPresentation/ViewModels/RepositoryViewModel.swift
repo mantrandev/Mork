@@ -283,7 +283,7 @@ public final class RepositoryViewModel {
     public let externalTools = ExternalToolRuns()
     public let signatureBadges = SignatureBadgeStore()
     public let commitMessages = CommitMessageStore()
-    let preloader = CommitPreloader(capacity: RepositoryViewModel.commitPreloadCapacity)
+    let preloader = CommitPreloader(capacity: RepositoryViewModel.commitPreloadCapacity, byteBudget: RepositoryViewModel.commitPreloadByteBudget)
     let workingDiffs = WorkingCopyDiffCache(capacity: RepositoryViewModel.commitPreloadCapacity)
     public let advanced = AdvancedTools()
     public internal(set) var customCommandMenus: [CustomCommandLocation: [CustomCommand]] = [:]
@@ -372,6 +372,12 @@ public final class RepositoryViewModel {
 
     public func stopWatching() {
         watch.cancel()
+    }
+
+    public func releaseMemory() {
+        preloader.releaseMemory()
+        workingDiffs.clear()
+        rangeChanges.releaseMemory()
     }
 
     public func refresh(reportingErrors: Bool = true) async {

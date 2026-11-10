@@ -17,9 +17,14 @@ final class CommitPreloader {
         let lfsPointer: LFSPointerChange?
         let tabWidth: Int
         var files: [String: PreparedFile] = [:]
+
+        var cost: Int {
+            files.values.reduce(text.utf8.count) { $0 + $1.text.utf8.count }
+        }
     }
 
     let capacity: Int
+    let byteBudget: Int
     private var summaries: [String: CommitSummary] = [:]
     private var details: [String: PreparedDetail] = [:]
     private var summaryTasks: [String: Task<Result<CommitSummary, Error>, Never>] = [:]
@@ -28,8 +33,9 @@ final class CommitPreloader {
     var hoverTask: Task<Void, Never>?
     var hoveredHash: String?
 
-    init(capacity: Int) {
+    init(capacity: Int, byteBudget: Int) {
         self.capacity = capacity
+        self.byteBudget = byteBudget
     }
 
     func summary(of hash: String) -> CommitSummary? {
@@ -75,6 +81,12 @@ final class CommitPreloader {
         detailTasks = [:]
     }
 
+    func releaseMemory() {
+        summaries = [:]
+        details = [:]
+        order = []
+    }
+
     var pendingTasks: [Task<Void, Never>] {
         let summaries = summaryTasks.values.map { task in Task { _ = await task.value } }
         let details = detailTasks.values.map { task in Task { _ = await task.value } }
@@ -88,7 +100,13 @@ final class CommitPreloader {
 
     private func finishDetail(_ hash: String, _ result: Result<PreparedDetail, Error>) {
         detailTasks[hash] = nil
-        if case let .success(detail) = result, order.contains(hash) { details[hash] = detail }
+        guard case let .success(detail) = result, order.contains(hash), detail.cost <= byteBudget else { return }
+        details[hash] = detail
+        var total = details.values.reduce(0) { $0 + $1.cost }
+        for evicted in order where total > byteBudget && evicted != hash {
+            guard let dropped = details.removeValue(forKey: evicted) else { continue }
+            total -= dropped.cost
+        }
     }
 
     private func touch(_ hash: String) {
