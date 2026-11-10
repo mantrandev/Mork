@@ -1,5 +1,30 @@
 # Changelog
 
+## v0.0.2 (2026-11-10)
+
+### Interactive rebase
+
+- Selecting a commit lists its changed files. Each file expands to its diff, and Expand All loads every diff of the commit.
+- A new Changes tab shows the commit like the Changes tab in the main window: file list with filter and tree mode, and the diff of the selected file. The sheet remembers the last tab.
+- The selected step stays gray when the list has focus.
+
+### Diffs
+
+- Changes has the same file header bar as History.
+- New toggles: show invisible characters, wrap long lines and show the entire file.
+- Side-by-side diffs mark a leading tab or space.
+- Narrow headers fold the diff options into one menu.
+
+### Fetch and pull
+
+- Pull runs first, then fetches all remotes in the background.
+- Auto-fetch runs when you return to a tab or to the app and the interval has passed.
+- A failed background fetch no longer opens a dialog. It still shows in the Git Console.
+
+### Branches
+
+- New-branch dialogs remember the check out choice.
+
 ## v0.0.1 (2026-11-07)
 
 The first public release of Mork, a native Git client for macOS that teaches Git as you use it.
