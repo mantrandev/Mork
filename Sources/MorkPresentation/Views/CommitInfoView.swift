@@ -647,7 +647,7 @@ struct FileFilterRow<Trailing: View>: View {
     }
 }
 
-private struct CommitFileListRowView: View {
+struct CommitFileListRowView: View {
     let row: CommitFileListRow
     let isLFS: Bool
 
