@@ -31,6 +31,16 @@ struct CommitTabRow: Identifiable, Equatable {
     let detail: Detail?
 
     var id: String { file.path }
+
+    init(file: CommitFileChange, isExpanded: Bool, state: InlineDiffState?) {
+        self.file = file
+        self.isExpanded = isExpanded
+        detail = switch isExpanded ? state : nil {
+        case let .loaded(document): document.isCollapsed ? .large(document.totalLines) : .diff(document)
+        case let .failed(message): .failed(message)
+        case .loading, nil: nil
+        }
+    }
 }
 
 extension RepositoryViewModel {
@@ -104,17 +114,43 @@ extension RepositoryViewModel {
         var rows: [CommitTabRow] = []
         rows.reserveCapacity(files.count)
         for file in files {
-            let isExpanded = inlineDiffs.expanded.contains(file.path)
-            let detail: CommitTabRow.Detail? = switch isExpanded ? inlineDiffs.states[file.path] : nil {
-            case let .loaded(document): document.isCollapsed ? .large(document.totalLines) : .diff(document)
-            case let .failed(message): .failed(message)
-            case .loading, nil: nil
-            }
-            rows.append(CommitTabRow(file: file, isExpanded: isExpanded, detail: detail))
+            rows.append(CommitTabRow(file: file, isExpanded: inlineDiffs.expanded.contains(file.path), state: inlineDiffs.states[file.path]))
         }
         if rows != commitTabRows { commitTabRows = rows }
         let allExpanded = !files.isEmpty && files.allSatisfy { inlineDiffs.expanded.contains($0.path) }
         if allExpanded != areAllInlineDiffsExpanded { areAllInlineDiffsExpanded = allExpanded }
+    }
+
+    func inlineDiffStates(of files: [CommitFileChange], in commit: Commit) async -> [String: InlineDiffState] {
+        let tabWidth = settings.diff.tabWidth
+        var states: [String: InlineDiffState] = [:]
+        var remaining = files
+        var ready = preloader.detail(of: commit.hash, tabWidth: tabWidth)
+        if ready == nil, files.count > 1 {
+            switch await commitDetailTask(for: commit).value {
+            case let .success(detail): ready = detail
+            case let .failure(error): return files.reduce(into: [:]) { $0[$1.path] = .failed(error.localizedDescription) }
+            }
+        }
+        if let ready {
+            remaining = files.filter { file in
+                guard let prepared = ready.files[file.path] else { return true }
+                states[file.path] = .loaded(prepared.document)
+                return false
+            }
+        }
+        let load = dependencies.loadCommitFileDiff
+        for file in remaining {
+            do {
+                let text = try await load.execute(commit: commit, file: file)
+                states[file.path] = .loaded(await Task.detached(priority: .userInitiated) {
+                    DiffDocument.make(text: text, patch: nil, isCommit: false, tabWidth: tabWidth, showsLarge: false)
+                }.value)
+            } catch {
+                states[file.path] = .failed(error.localizedDescription)
+            }
+        }
+        return states
     }
 
     private func claimInlineDiffs(for commit: Commit) {

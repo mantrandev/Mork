@@ -51,6 +51,17 @@ public struct RebaseMessageDraft: Identifiable, Equatable, Sendable {
     private var trimmedSubject: String { subject.trimmingCharacters(in: .whitespacesAndNewlines) }
 }
 
+struct RebaseCommitChanges {
+    let summary: @MainActor (Commit) async -> Result<CommitSummary, Error>
+    let diffs: @MainActor ([CommitFileChange], Commit) async -> [String: InlineDiffState]
+}
+
+enum RebaseCommitFiles: Equatable {
+    case loading
+    case loaded([CommitFileChange])
+    case failed(String)
+}
+
 @MainActor
 @Observable
 public final class InteractiveRebaseViewModel: Identifiable {
@@ -67,21 +78,37 @@ public final class InteractiveRebaseViewModel: Identifiable {
     public private(set) var meldMarkers: [RebaseStep.ID: MeldMarker] = [:]
     public private(set) var isRunning = false
     public private(set) var messageDraft: RebaseMessageDraft?
-    public var selectedStepID: RebaseStep.ID?
+    public var selectedStepID: RebaseStep.ID? {
+        didSet { if selectedStepID != oldValue { showSelectedCommit() } }
+    }
     public var updatesDependentBranches = false
     public var createsBackup = false
+    private(set) var commitFiles: RebaseCommitFiles?
+    private(set) var commitTabRows: [CommitTabRow] = []
+    public private(set) var areAllInlineDiffsExpanded = false
 
     @ObservationIgnored private let run: Run
+    @ObservationIgnored private let changes: RebaseCommitChanges?
+    @ObservationIgnored private var filesByCommit: [String: RebaseCommitFiles] = [:]
+    @ObservationIgnored private var diffsByCommit: [String: [String: InlineDiffState]] = [:]
+    @ObservationIgnored private var expanded: Set<String> = []
+    @ObservationIgnored private var tasks: [UUID: Task<Void, Never>] = [:]
 
-    public init(base: RebaseBase, branchName: String, steps: [RebaseStep], skippedMerges: [Commit] = [], hasUncommittedChanges: Bool, run: @escaping Run) {
+    public convenience init(base: RebaseBase, branchName: String, steps: [RebaseStep], skippedMerges: [Commit] = [], hasUncommittedChanges: Bool, run: @escaping Run) {
+        self.init(base: base, branchName: branchName, steps: steps, skippedMerges: skippedMerges, hasUncommittedChanges: hasUncommittedChanges, changes: nil, run: run)
+    }
+
+    init(base: RebaseBase, branchName: String, steps: [RebaseStep], skippedMerges: [Commit], hasUncommittedChanges: Bool, changes: RebaseCommitChanges?, run: @escaping Run) {
         self.base = base
         self.branchName = branchName
         self.steps = steps
         self.skippedMerges = skippedMerges
         self.hasUncommittedChanges = hasUncommittedChanges
+        self.changes = changes
         self.run = run
         selectedStepID = steps.last?.id
         meldMarkers = Self.meldMarkers(for: steps.reversed())
+        showSelectedCommit()
     }
 
     public var displayedSteps: [RebaseStep] { steps.reversed() }
@@ -196,6 +223,90 @@ public final class InteractiveRebaseViewModel: Identifiable {
         let backup = createsBackup ? RebaseBackup.branchName(for: branchName, at: Date()) : nil
         await run(steps, InteractiveRebaseOptions(autostash: hasUncommittedChanges, updateRefs: updatesDependentBranches, backupBranch: backup))
         isRunning = false
+    }
+
+    public func toggleInlineDiff(_ file: CommitFileChange) {
+        guard let commit = selectedStep?.commit, case let .loaded(files) = commitFiles, files.contains(file) else { return }
+        if expanded.remove(file.path) == nil {
+            expanded.insert(file.path)
+            loadDiffs([file], in: commit)
+        }
+        rebuildCommitTabRows()
+    }
+
+    public func expandAllInlineDiffs() {
+        guard let commit = selectedStep?.commit, case let .loaded(files) = commitFiles, !files.isEmpty else { return }
+        expanded = Set(files.map(\.path))
+        loadDiffs(files, in: commit)
+        rebuildCommitTabRows()
+    }
+
+    public func collapseAllInlineDiffs() {
+        guard !expanded.isEmpty else { return }
+        expanded = []
+        rebuildCommitTabRows()
+    }
+
+    public func waitForCommitChanges() async {
+        while let task = tasks.values.first {
+            await task.value
+        }
+    }
+
+    private func showSelectedCommit() {
+        expanded = []
+        if let changes, let commit = selectedStep?.commit, filesByCommit[commit.hash] == nil {
+            filesByCommit[commit.hash] = .loading
+            track { [weak self] in
+                let result = await changes.summary(commit)
+                guard let self else { return }
+                switch result {
+                case let .success(summary): self.filesByCommit[commit.hash] = .loaded(summary.files)
+                case let .failure(error): self.filesByCommit[commit.hash] = .failed(error.localizedDescription)
+                }
+                self.rebuildCommitTabRows()
+            }
+        }
+        rebuildCommitTabRows()
+    }
+
+    private func loadDiffs(_ files: [CommitFileChange], in commit: Commit) {
+        guard let changes else { return }
+        let known = diffsByCommit[commit.hash] ?? [:]
+        let missing = files.filter { file in
+            switch known[file.path] {
+            case .loaded, .loading: false
+            case .failed, nil: true
+            }
+        }
+        guard !missing.isEmpty else { return }
+        for file in missing { diffsByCommit[commit.hash, default: [:]][file.path] = .loading }
+        track { [weak self] in
+            let states = await changes.diffs(missing, commit)
+            guard let self else { return }
+            self.diffsByCommit[commit.hash, default: [:]].merge(states) { _, new in new }
+            self.rebuildCommitTabRows()
+        }
+    }
+
+    private func rebuildCommitTabRows() {
+        let commit = selectedStep?.commit
+        let state = commit.flatMap { filesByCommit[$0.hash] }
+        if state != commitFiles { commitFiles = state }
+        let files: [CommitFileChange] = if case let .loaded(files) = state { files } else { [] }
+        let diffs = commit.flatMap { diffsByCommit[$0.hash] } ?? [:]
+        let rows = files.map { CommitTabRow(file: $0, isExpanded: expanded.contains($0.path), state: diffs[$0.path]) }
+        if rows != commitTabRows { commitTabRows = rows }
+        let allExpanded = !files.isEmpty && files.allSatisfy { expanded.contains($0.path) }
+        if allExpanded != areAllInlineDiffsExpanded { areAllInlineDiffsExpanded = allExpanded }
+    }
+
+    private func track(_ work: @escaping @MainActor () async -> Void) {
+        let id = UUID()
+        tasks[id] = Task { [weak self] in
+            await work()
+            self?.tasks[id] = nil
+        }
     }
 
     private func index(of id: RebaseStep.ID) -> Int? {
