@@ -86,7 +86,7 @@ struct CreateBranchSheet: View {
 
     let viewModel: RepositoryViewModel
     @State private var name = "feature/"
-    @State private var checkout = true
+    @AppStorage(BranchAtCommitSheet.checkoutKey) private var checkout = true
     @State private var start: String
 
     init(viewModel: RepositoryViewModel) {
