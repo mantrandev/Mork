@@ -68,28 +68,15 @@ extension RepositoryViewModel {
 
     private func fetchAutomatically() async {
         guard !isBusy, !remotes.isEmpty else { return }
-        var failure: (any Error)?
         await perform { dependencies in
-            do {
-                try await dependencies.fetchRemotes.execute()
-            } catch {
-                failure = error
-            }
+            try? await dependencies.fetchRemotes.execute()
         }
         autoFetch.lastAttempt = now()
-        guard let failure else {
-            autoFetch.hasReportedFailure = false
-            return
-        }
-        guard !autoFetch.hasReportedFailure else { return }
-        autoFetch.hasReportedFailure = true
-        errorMessage = "Automatic fetch failed: \(failure.localizedDescription)\nMork keeps trying every \(settings.autoFetch.rawValue) minutes and tells you again only after a fetch works."
     }
 }
 
 final class AutoFetchState {
     var task: Task<Void, Never>?
-    var hasReportedFailure = false
     var lastAttempt: ContinuousClock.Instant?
 
     func remaining(of interval: Duration, at now: ContinuousClock.Instant) -> Duration {
