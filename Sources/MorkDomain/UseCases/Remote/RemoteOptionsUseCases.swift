@@ -67,7 +67,6 @@ public final class PullBranchWithModeUseCase: PullBranchWithModeUseCaseProtocol 
         guard branch != nil else { throw GitDomainError.detachedHead }
         guard try await !remote.remotes().isEmpty else { throw GitDomainError.noRemote }
         preferences.savePullMode(mode, for: repository)
-        try await remote.fetch(options: FetchOptions(remote: nil, prune: false, tags: false))
         try await remote.pull(mode: mode)
     }
 }
@@ -88,7 +87,6 @@ public final class PullBranchWithOptionsUseCase: PullBranchWithOptionsUseCasePro
         guard !options.remote.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { throw GitDomainError.noRemote }
         preferences.savePullMode(options.rebase ? .rebase : .merge, for: repository)
         preferences.saveAutostash(options.autostash, for: repository)
-        try await remote.fetch(options: FetchOptions(remote: nil, prune: false, tags: false))
         try await remote.pull(options: options)
     }
 }
