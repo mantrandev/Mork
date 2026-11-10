@@ -295,6 +295,7 @@ public final class RepositoryViewModel {
     let now: @Sendable () -> ContinuousClock.Instant
     @ObservationIgnored let explorationTasks = ExplorationTasks()
     @ObservationIgnored let autoFetch = AutoFetchState()
+    @ObservationIgnored var backgroundFetch: Task<Void, Never>?
     @ObservationIgnored var lineAnchor: DiffLineID?
     @ObservationIgnored var lineDragStart: DiffLineID?
     @ObservationIgnored var lineDragBase = DiffLineSelection()
@@ -689,7 +690,9 @@ public final class RepositoryViewModel {
 
     public func pull() async {
         let branch = currentBranch
-        await tracking(.pull) { _ = await perform { try await $0.pullBranch.execute(branch: branch) } }
+        await tracking(.pull) {
+            if await perform({ try await $0.pullBranch.execute(branch: branch) }) { fetchAllInBackground() }
+        }
     }
 
     public func push() async {

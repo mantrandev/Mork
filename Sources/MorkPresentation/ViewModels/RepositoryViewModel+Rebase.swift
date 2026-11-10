@@ -80,13 +80,32 @@ extension RepositoryViewModel {
     @discardableResult
     public func pull(options: PullOptions) async -> Bool {
         let branch = currentBranch
-        return await perform { try await $0.remoteOptions.pullWithOptions.execute(branch: branch, options: options) }
+        let pulled = await perform { try await $0.remoteOptions.pullWithOptions.execute(branch: branch, options: options) }
+        if pulled { fetchAllInBackground() }
+        return pulled
     }
 
     @discardableResult
     public func pull(mode: PullMode) async -> Bool {
         let branch = currentBranch
-        return await perform { try await $0.remoteOptions.pullWithMode.execute(branch: branch, mode: mode) }
+        let pulled = await perform { try await $0.remoteOptions.pullWithMode.execute(branch: branch, mode: mode) }
+        if pulled { fetchAllInBackground() }
+        return pulled
+    }
+
+    func fetchAllInBackground() {
+        backgroundFetch = Task { [weak self] in
+            guard let self else { return }
+            await tracking(.fetch) {
+                await perform { dependencies in
+                    try? await dependencies.remoteOptions.fetchWithOptions.execute(options: FetchOptions(remote: nil, prune: false, tags: false))
+                }
+            }
+        }
+    }
+
+    public func waitForBackgroundFetch() async {
+        await backgroundFetch?.value
     }
 
     public func loadRemotes() async -> [String] {
