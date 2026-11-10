@@ -10,7 +10,14 @@ struct InteractiveRebaseSheet: View {
         VStack(spacing: 0) {
             RebaseHeader(session: session)
             Hairline()
-            VSplitView {
+            PaneSplit(
+                .vertical,
+                key: PaneSplitKey.rebaseStepsHeight,
+                defaultSize: Metrics.Rebase.stepsIdealHeight,
+                range: Metrics.Rebase.stepsMinimumHeight...Metrics.Rebase.stepsMaximumHeight,
+                mainMinimum: Metrics.Rebase.detailsMinimumHeight,
+                identifier: "rebaseSheet.resize"
+            ) {
                 List(selection: $session.selectedStepID) {
                     ForEach(session.displayedSteps) { step in
                         RebaseStepRow(session: session, step: step)
@@ -31,10 +38,9 @@ struct InteractiveRebaseSheet: View {
                     return .handled
                 }
                 .listStyle(.inset(alternatesRowBackgrounds: true))
-                .frame(minHeight: Metrics.Rebase.stepsMinimumHeight, idealHeight: Metrics.Rebase.stepsIdealHeight)
                 .accessibilityIdentifier("rebaseSheet.steps")
+            } main: {
                 RebaseDetails(session: session, tab: $detailsTab)
-                    .frame(minHeight: Metrics.Rebase.detailsMinimumHeight)
             }
             Hairline()
             RebaseFooter(session: session) { dismiss() }
@@ -316,7 +322,7 @@ private struct RebaseDetails: View {
             switch tab {
             case .commit:
                 if let step = session.selectedStep {
-                    RebaseCommitDetails(step: step)
+                    RebaseCommitDetails(session: session, step: step)
                 } else {
                     EmptyStateView("No Commit Selected", systemImage: "smallcircle.filled.circle", message: "Select a commit to see its details.")
                 }
@@ -328,6 +334,7 @@ private struct RebaseDetails: View {
 }
 
 private struct RebaseCommitDetails: View {
+    let session: InteractiveRebaseViewModel
     let step: RebaseStep
 
     var body: some View {
@@ -340,9 +347,49 @@ private struct RebaseCommitDetails: View {
             .commitOverviewRow(height: Metrics.CommitDetails.fieldRowHeight)
             CommitMessageRow(message: step.action == .reword ? step.message : step.originalMessage)
                 .commitOverviewRow(height: nil)
+            if case let .failed(message) = session.commitFiles {
+                Label("Could not load the changes: \(message)", systemImage: "exclamationmark.triangle")
+                    .font(Metrics.Font.caption)
+                    .foregroundStyle(Palette.Text.secondary.color)
+                    .commitOverviewRow(height: Metrics.Row.list)
+            }
+            if !session.commitTabRows.isEmpty {
+                CommitFilesHeaderRow(isExpanded: session.areAllInlineDiffsExpanded) {
+                    if session.areAllInlineDiffsExpanded { session.collapseAllInlineDiffs() } else { session.expandAllInlineDiffs() }
+                }
+                .commitOverviewRow(height: Metrics.CommitDetails.filesHeaderHeight)
+                ForEach(session.commitTabRows) { row in
+                    RebaseFileRow(session: session, row: row)
+                }
+            }
         }
         .listStyle(.plain)
+        .environment(\.defaultMinListRowHeight, Metrics.CommitDetails.inlineLineHeight)
         .accessibilityIdentifier("rebaseSheet.commit")
+    }
+}
+
+private struct RebaseFileRow: View {
+    let session: InteractiveRebaseViewModel
+    let row: CommitTabRow
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            CommitOverviewFileRow(file: row.file, isExpanded: row.isExpanded, isLFS: false) {
+                session.toggleInlineDiff(row.file)
+            }
+            .frame(height: Metrics.Row.list)
+            .contentShape(Rectangle())
+            .onTapGesture { session.toggleInlineDiff(row.file) }
+            if let detail = row.detail {
+                CommitInlineDetail(detail: detail, path: row.file.path)
+                    .padding(.leading, Metrics.CommitDetails.labelColumnWidth + Metrics.CommitDetails.columnGap)
+                    .padding(.bottom, Metrics.Spacing.xs)
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .listRowInsets(EdgeInsets(top: 0, leading: Metrics.CommitDetails.rowInset, bottom: 0, trailing: Metrics.CommitDetails.rowInset))
+        .listRowSeparator(.hidden)
     }
 }
 

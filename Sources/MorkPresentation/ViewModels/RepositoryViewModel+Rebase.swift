@@ -23,7 +23,15 @@ extension RepositoryViewModel {
                 branchName: branch?.name ?? "HEAD",
                 steps: range.steps,
                 skippedMerges: range.skippedMerges,
-                hasUncommittedChanges: hasUncommittedChanges
+                hasUncommittedChanges: hasUncommittedChanges,
+                changes: RebaseCommitChanges(
+                    summary: { [weak self] commit in
+                        await self?.summaryTask(for: commit).value ?? .failure(CancellationError())
+                    },
+                    diffs: { [weak self] files, commit in
+                        await self?.inlineDiffStates(of: files, in: commit) ?? [:]
+                    }
+                )
             ) { [weak self] steps, options in
                 await self?.runInteractiveRebase(onto: base, steps: steps, options: options)
             }

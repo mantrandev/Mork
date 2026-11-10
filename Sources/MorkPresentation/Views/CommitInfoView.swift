@@ -385,7 +385,7 @@ struct CommitMessageRow: View {
     }
 }
 
-private struct CommitFilesHeaderRow: View {
+struct CommitFilesHeaderRow: View {
     let isExpanded: Bool
     let toggle: () -> Void
 
@@ -428,10 +428,10 @@ private struct CommitTabRowView: View {
     }
 }
 
-private struct CommitInlineDetail: View {
+struct CommitInlineDetail: View {
     let detail: CommitTabRow.Detail
     let path: String
-    let open: () -> Void
+    var open: (() -> Void)?
 
     var body: some View {
         switch detail {
@@ -449,10 +449,12 @@ private struct CommitInlineDetail: View {
             HStack(spacing: Metrics.Spacing.s) {
                 Text("This diff has \(lines.formatted()) lines.")
                     .foregroundStyle(Palette.Text.secondary.color)
-                Button("Open in Changes", action: open)
-                    .buttonStyle(.plain)
-                    .foregroundStyle(Palette.Accent.text.color)
-                    .linkCursor()
+                if let open {
+                    Button("Open in Changes", action: open)
+                        .buttonStyle(.plain)
+                        .foregroundStyle(Palette.Accent.text.color)
+                        .linkCursor()
+                }
             }
             .font(Metrics.Font.caption)
             .frame(height: Metrics.CommitDetails.inlineLineHeight)
@@ -460,7 +462,7 @@ private struct CommitInlineDetail: View {
     }
 }
 
-private struct CommitOverviewFileRow: View {
+struct CommitOverviewFileRow: View {
     let file: CommitFileChange
     let isExpanded: Bool
     let isLFS: Bool

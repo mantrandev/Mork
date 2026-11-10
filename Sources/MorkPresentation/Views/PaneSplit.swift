@@ -7,6 +7,7 @@ enum PaneSplitKey {
     static let changesFilesHeight = "commitDetails.filesHeight"
     static let inspectorListWidth = "inspector.listWidth"
     static let changesListWidth = "changes.listWidth"
+    static let rebaseStepsHeight = "rebase.stepsHeight"
 }
 
 enum PaneSplitAxis {

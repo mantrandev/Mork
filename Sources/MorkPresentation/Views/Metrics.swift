@@ -371,7 +371,8 @@ enum Metrics {
 
     enum Rebase {
         static let stepsMinimumHeight: CGFloat = 160
-        static let stepsIdealHeight: CGFloat = 300
+        static let stepsIdealHeight: CGFloat = 160
+        static let stepsMaximumHeight: CGFloat = 480
         static let detailsMinimumHeight: CGFloat = 160
         static let dot: CGFloat = 8
         static let actionColumn: CGFloat = 110
