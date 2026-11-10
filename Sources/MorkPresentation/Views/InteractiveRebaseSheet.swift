@@ -10,7 +10,14 @@ struct InteractiveRebaseSheet: View {
         VStack(spacing: 0) {
             RebaseHeader(session: session)
             Hairline()
-            VSplitView {
+            PaneSplit(
+                .vertical,
+                key: PaneSplitKey.rebaseStepsHeight,
+                defaultSize: Metrics.Rebase.stepsIdealHeight,
+                range: Metrics.Rebase.stepsMinimumHeight...Metrics.Rebase.stepsMaximumHeight,
+                mainMinimum: Metrics.Rebase.detailsMinimumHeight,
+                identifier: "rebaseSheet.resize"
+            ) {
                 List(selection: $session.selectedStepID) {
                     ForEach(session.displayedSteps) { step in
                         RebaseStepRow(session: session, step: step)
@@ -31,10 +38,9 @@ struct InteractiveRebaseSheet: View {
                     return .handled
                 }
                 .listStyle(.inset(alternatesRowBackgrounds: true))
-                .frame(minHeight: Metrics.Rebase.stepsMinimumHeight, idealHeight: Metrics.Rebase.stepsIdealHeight)
                 .accessibilityIdentifier("rebaseSheet.steps")
+            } main: {
                 RebaseDetails(session: session, tab: $detailsTab)
-                    .frame(minHeight: Metrics.Rebase.detailsMinimumHeight)
             }
             Hairline()
             RebaseFooter(session: session) { dismiss() }
