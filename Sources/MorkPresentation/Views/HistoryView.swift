@@ -255,6 +255,8 @@ struct HistoryView: View {
 }
 
 struct BranchAtCommitSheet: View {
+    static let checkoutKey = "branch.checkoutNew"
+
     let title: String
     let startPoint: String
     let branchNames: [String]
@@ -262,7 +264,7 @@ struct BranchAtCommitSheet: View {
     let onConfirm: (String, Bool) -> Void
     @Environment(\.dismiss) private var dismiss
     @State private var name = ""
-    @State private var checkout = false
+    @AppStorage(BranchAtCommitSheet.checkoutKey) private var checkout = false
 
     init(title: String, startPoint: String, identifier: String, branchNames: [String], onConfirm: @escaping (String, Bool) -> Void) {
         self.title = title
