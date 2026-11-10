@@ -14,6 +14,7 @@ public final class PullBranchUseCase: PullBranchUseCaseProtocol {
     public func execute(branch: Branch?) async throws {
         guard branch != nil else { throw GitDomainError.detachedHead }
         guard try await !remote.remotes().isEmpty else { throw GitDomainError.noRemote }
+        try await remote.fetch(options: FetchOptions(remote: nil, prune: false, tags: false))
         try await remote.pull()
     }
 }
