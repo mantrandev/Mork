@@ -77,10 +77,21 @@ struct DiffTableView: NSViewRepresentable {
         private var actionsHost: NSHostingView<HunkHoverActions>?
         private var numberColumns = 2
         private var handledJump: Int?
+        private var wrap: DiffWrapLayout?
+        private var columnCounts: [Int: Int] = [:]
 
         var numberWidth: CGFloat {
             guard let view, view.document.lineNumberDigits > 0 else { return 0 }
             return CGFloat(view.document.lineNumberDigits) * view.metrics.numberCharacterWidth + Metrics.Diff.numberPadding
+        }
+
+        private var gutterWidth: CGFloat {
+            numberWidth > 0 ? (numberWidth + Metrics.Diff.numberGap) * CGFloat(numberColumns) : 0
+        }
+
+        private var wrapLayout: DiffWrapLayout? {
+            let width = table?.enclosingScrollView?.contentView.bounds.width ?? 0
+            return view?.metrics.wrapLayout(textWidth: width - gutterWidth - Metrics.Diff.textInset)
         }
 
         func update(_ next: DiffTableView) {
@@ -91,11 +102,16 @@ struct DiffTableView: NSViewRepresentable {
             if documentChanged {
                 attributed = [:]
                 cardHeights = [:]
+                columnCounts = [:]
                 indexRows(next)
                 font = .monospacedSystemFont(ofSize: next.metrics.fontSize, weight: .regular)
                 numberFont = .monospacedSystemFont(ofSize: next.metrics.numberFontSize, weight: .regular)
                 table.rowHeight = next.metrics.rowHeight
-                table.tableColumns.first?.minWidth = CGFloat(next.document.maxColumns) * next.metrics.characterWidth + numberWidth * 2 + Metrics.Diff.columnSlack
+                wrap = wrapLayout
+                table.enclosingScrollView?.hasHorizontalScroller = !next.metrics.wrapsLines
+                table.tableColumns.first?.minWidth = next.metrics.wrapsLines
+                    ? gutterWidth + Metrics.Diff.textInset + Metrics.Diff.wrapMinimumColumns * next.metrics.characterWidth
+                    : CGFloat(next.document.maxColumns) * next.metrics.characterWidth + numberWidth * 2 + Metrics.Diff.columnSlack
                 table.reloadData()
                 table.sizeLastColumnToFit()
                 handledJump = next.hunkJump?.id
@@ -182,8 +198,9 @@ struct DiffTableView: NSViewRepresentable {
         func tableView(_ tableView: NSTableView, heightOfRow row: Int) -> CGFloat {
             guard let view, let block = block(at: row) else { return tableView.rowHeight }
             switch block {
-            case .line:
-                return view.metrics.rowHeight
+            case let .line(line):
+                guard let wrap else { return view.metrics.rowHeight }
+                return wrap.height(forColumns: columns(of: line, tabWidth: view.metrics.tabWidth))
             case .hunk:
                 return Metrics.Diff.hunkRow
             case .file:
@@ -210,7 +227,8 @@ struct DiffTableView: NSViewRepresentable {
                     numberColumns: numberColumns,
                     source: source,
                     isSelected: source.map { view.lineState.selection.contains($0) } ?? false,
-                    allowsTextSelection: view.lineModel == nil
+                    allowsTextSelection: view.lineModel == nil,
+                    wrap: wrap
                 )
                 cell.onClick = { [weak self] click in
                     guard let source, let model = self?.view?.lineModel else { return }
@@ -240,8 +258,29 @@ struct DiffTableView: NSViewRepresentable {
         }
 
         @objc func visibleWidthChanged() {
+            rewrap()
             guard abs(visibleWidth - measuredWidth) > 0.5 else { return }
             remeasureCards()
+        }
+
+        private func rewrap() {
+            guard let table, view?.metrics.wrapsLines == true else { return }
+            let next = wrapLayout
+            guard next != wrap else { return }
+            wrap = next
+            guard !rows.isEmpty else { return }
+            table.noteHeightOfRows(withIndexesChanged: IndexSet(integersIn: rows.indices))
+            let visible = table.rows(in: table.visibleRect)
+            guard visible.length > 0 else { return }
+            table.reloadData(forRowIndexes: IndexSet(integersIn: visible.location..<(visible.location + visible.length)), columnIndexes: IndexSet(integer: 0))
+            layoutHover()
+        }
+
+        private func columns(of line: DiffLine, tabWidth: Int) -> Int {
+            if let cached = columnCounts[line.id] { return cached }
+            let count = DiffTabs.columns(of: line.text, width: tabWidth)
+            columnCounts[line.id] = count
+            return count
         }
 
         private func remeasureCards() {
@@ -345,7 +384,8 @@ struct DiffTableView: NSViewRepresentable {
         private func text(for line: DiffLine) -> NSAttributedString {
             if let cached = attributed[line.id] { return cached }
             guard let view else { return NSAttributedString(string: line.text) }
-            let result = DiffLineText.make(line, font: font, tabWidth: view.metrics.tabWidth)
+            let metrics = view.metrics
+            let result = DiffLineText.make(line, font: font, tabWidth: metrics.tabWidth, showsInvisibles: metrics.showsInvisibles, wrapLineHeight: metrics.wrapsLines ? metrics.lineHeight : nil)
             attributed[line.id] = result
             return result
         }
@@ -409,6 +449,17 @@ struct DiffHunkJump: Equatable {
     let direction: Direction
 }
 
+struct DiffWrapLayout: Equatable {
+    let columns: Int
+    let characterWidth: CGFloat
+    let rowHeight: CGFloat
+    let lineHeight: CGFloat
+
+    func height(forColumns count: Int) -> CGFloat {
+        rowHeight + CGFloat(DiffWrap.rows(columns: count, perRow: columns) - 1) * lineHeight
+    }
+}
+
 struct DiffLineState: Equatable {
     let selection: DiffLineSelection
     let hasChanges: Bool
@@ -423,16 +474,37 @@ private enum DiffCellID {
 }
 
 enum DiffLineText {
-    static func make(_ line: DiffLine, font: NSFont, tabWidth: Int) -> NSAttributedString {
-        let expanded = DiffTabs.expand(line.text, changed: line.changed, width: tabWidth)
+    static func make(_ line: DiffLine, font: NSFont, tabWidth: Int, showsInvisibles: Bool = false, wrapLineHeight: CGFloat? = nil) -> NSAttributedString {
+        let expanded = DiffTabs.expand(line.text, changed: line.changed, width: tabWidth, marksInvisiblesAfter: showsInvisibles ? invisiblesStart(of: line) : nil)
         let string = expanded.text.isEmpty ? " " : expanded.text
         let color = line.kind == .meta ? Palette.Text.secondary.nsColor : Palette.Text.primary.nsColor
         let result = NSMutableAttributedString(string: string, attributes: [.font: font, .foregroundColor: color])
-        if let changed = expanded.changed, changed.upperBound <= (string as NSString).length {
+        let length = (string as NSString).length
+        if let changed = expanded.changed, changed.upperBound <= length {
             let highlight = line.kind == .addition ? Palette.Diff.addedWord.nsColor : Palette.Diff.deletedWord.nsColor
-            result.addAttribute(.diffWordHighlight, value: highlight, range: NSRange(location: changed.lowerBound, length: changed.count))
+            result.addAttribute(wrapLineHeight == nil ? .diffWordHighlight : .backgroundColor, value: highlight, range: NSRange(location: changed.lowerBound, length: changed.count))
+        }
+        if let wrapLineHeight {
+            let paragraph = NSMutableParagraphStyle()
+            paragraph.lineBreakMode = .byCharWrapping
+            paragraph.minimumLineHeight = wrapLineHeight
+            paragraph.maximumLineHeight = wrapLineHeight
+            result.addAttribute(.paragraphStyle, value: paragraph, range: NSRange(location: 0, length: length))
+        }
+        let markColor = Palette.Text.tertiary.nsColor
+        for mark in expanded.marks where mark < length {
+            result.addAttribute(.foregroundColor, value: markColor, range: NSRange(location: mark, length: 1))
         }
         return result
+    }
+
+    static func invisiblesStart(of line: DiffLine) -> Int? {
+        switch line.kind {
+        case .addition, .deletion: 1
+        case .context where line.text.hasPrefix("\\"): nil
+        case .context: line.oldNumber == nil && line.newNumber != nil ? 0 : 1
+        case .hunk, .meta: nil
+        }
     }
 
     static func highlight(in text: NSAttributedString) -> (range: NSRange, color: NSColor)? {
@@ -552,6 +624,7 @@ final class DiffLineCell: NSView {
     private var isSelectable = false
     private var source: DiffLineID?
     private var word: (start: CGFloat, width: CGFloat, color: NSColor)?
+    private var wrap: DiffWrapLayout?
 
     override init(frame: NSRect) {
         super.init(frame: frame)
@@ -569,8 +642,13 @@ final class DiffLineCell: NSView {
 
     override var isFlipped: Bool { true }
 
-    func configure(line: DiffLine, text: NSAttributedString, font: NSFont, numberFont: NSFont, numberWidth: CGFloat, numberColumns: Int = 2, source: DiffLineID?, isSelected: Bool, allowsTextSelection: Bool) {
+    func configure(line: DiffLine, text: NSAttributedString, font: NSFont, numberFont: NSFont, numberWidth: CGFloat, numberColumns: Int = 2, source: DiffLineID?, isSelected: Bool, allowsTextSelection: Bool, wrap: DiffWrapLayout? = nil) {
         self.line = line
+        self.wrap = wrap
+        content.usesSingleLineMode = wrap == nil
+        content.cell?.wraps = wrap != nil
+        content.lineBreakMode = wrap == nil ? .byClipping : .byCharWrapping
+        content.maximumNumberOfLines = wrap == nil ? 1 : 0
         self.numberWidth = numberWidth
         self.numberColumns = numberColumns
         self.numberFont = numberFont
@@ -578,7 +656,7 @@ final class DiffLineCell: NSView {
         self.source = source
         isSelectable = source != nil
         content.attributedStringValue = text
-        word = DiffLineText.highlight(in: text).map { found in
+        word = wrap != nil ? nil : DiffLineText.highlight(in: text).map { found in
             let start = text.attributedSubstring(from: NSRange(location: 0, length: found.range.location)).size().width
             let end = text.attributedSubstring(from: NSRange(location: 0, length: NSMaxRange(found.range))).size().width
             return (start, end - start, found.color)
@@ -611,8 +689,13 @@ final class DiffLineCell: NSView {
     override func layout() {
         super.layout()
         let gutter = numberWidth > 0 ? (numberWidth + Metrics.Diff.numberGap) * CGFloat(numberColumns) : 0
-        let height = content.intrinsicContentSize.height
         let inset = Metrics.Diff.textInset
+        if let wrap {
+            let top = ((wrap.rowHeight - wrap.lineHeight) / 2).rounded(.down)
+            content.frame = NSRect(x: gutter + inset, y: top, width: DiffWrap.fieldWidth(columns: wrap.columns, characterWidth: wrap.characterWidth), height: max(0, bounds.height - top))
+            return
+        }
+        let height = content.intrinsicContentSize.height
         content.frame = NSRect(x: gutter + inset, y: (bounds.height - height) / 2, width: max(0, bounds.width - gutter - inset), height: height)
     }
 
@@ -649,7 +732,8 @@ final class DiffLineCell: NSView {
         guard let value else { return }
         let string = NSAttributedString(string: String(value), attributes: [.font: numberFont, .foregroundColor: color])
         let size = string.size()
-        string.draw(at: NSPoint(x: right - size.width, y: (bounds.height - size.height) / 2))
+        let height = wrap?.rowHeight ?? bounds.height
+        string.draw(at: NSPoint(x: right - size.width, y: (height - size.height) / 2))
     }
 
     override func mouseDown(with event: NSEvent) {

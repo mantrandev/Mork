@@ -2,6 +2,7 @@ import Foundation
 
 public struct DiffOptions: Hashable, Sendable, DiffOptionsProviding {
     public static let defaultContextLines = 3
+    public static let entireFileContextLines = 1_000_000
     public static let standard = DiffOptions()
 
     public let contextLines: Int

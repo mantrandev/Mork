@@ -69,7 +69,7 @@ struct DetailView: View {
                 } else if case .commit = viewModel.selection, !document.hasFileHeader {
                     EmptyStateView("No File Selected", systemImage: "doc.text", message: "Select a changed file to see its diff.")
                         .accessibilityIdentifier("detail.empty")
-                } else if showsFileHeaderBar, case .commitFile = viewModel.selection, case let .file(header, meta, additions, deletions)? = document.blocks.first {
+                } else if showsFileHeaderBar, let isWorkingCopy = headerBarKind, case let .file(header, meta, additions, deletions)? = document.blocks.first, document.blocks.dropFirst().allSatisfy({ if case .file = $0 { false } else { true } }) {
                     VStack(spacing: 0) {
                         DiffFileHeaderBar(
                             summary: DiffFileSummary(header: ([header] + meta).map(\.text), additions: additions, deletions: deletions),
@@ -78,12 +78,25 @@ struct DetailView: View {
                             toggleRaw: { viewModel.showsRawDiff.toggle() },
                             jump: { direction in hunkJump = DiffHunkJump(id: hunkJump.id + 1, direction: direction) },
                             options: viewModel.settings.diff,
+                            isWorkingCopy: isWorkingCopy,
                             changeOptions: { viewModel.changeDiffSettings($0) }
                         )
                         Hairline()
                         if viewModel.settings.diff.showsSideBySide {
                             SplitDiffTableView(document: document, metrics: metrics)
                                 .accessibilityIdentifier("detail.sideBySide")
+                        } else if let patch = viewModel.patch, !viewModel.hunkActions.isEmpty {
+                            DiffText(
+                                document: document,
+                                hunks: patch.hunks,
+                                actions: viewModel.hunkActions,
+                                perform: perform,
+                                lineModel: viewModel,
+                                performLines: performLines,
+                                menuModel: viewModel,
+                                hidesFileCards: true,
+                                hunkJump: hunkJump
+                            )
                         } else {
                             DiffText(document: document, menuModel: viewModel, hidesFileCards: true, hunkJump: hunkJump)
                         }
@@ -107,6 +120,14 @@ struct DetailView: View {
                 ProgressView()
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
             }
+        }
+    }
+
+    private var headerBarKind: Bool? {
+        switch viewModel.selection {
+        case .file: true
+        case .commitFile: false
+        case .commit, nil: nil
         }
     }
 
@@ -256,24 +277,74 @@ struct DiffFileCard: View {
 
 struct DiffViewOptions: View {
     let options: DiffSettings
+    var isWorkingCopy = false
     let change: ((inout DiffSettings) -> Void) -> Void
 
     var body: some View {
+        let help = DiffViewOptionsHelp(options: options, isWorkingCopy: isWorkingCopy)
         let range = DiffSettings.contextLineRange
-        DiffBarButton(systemImage: "paragraphsign", help: options.showsWhitespaceChanges ? "Hide Whitespace Changes" : "Show Whitespace Changes", identifier: "diff.whitespace", isOn: options.showsWhitespaceChanges) {
+        DiffBarButton(systemImage: "space", help: help.whitespace, identifier: "diff.whitespace", isOn: options.showsWhitespaceChanges && !isWorkingCopy) {
             change { $0.showsWhitespaceChanges.toggle() }
         }
-        DiffBarButton(systemImage: "arrow.down.right.and.arrow.up.left", help: "Fewer Context Lines (\(options.contextLines))", identifier: "diff.fewerContext") {
+        .disabled(isWorkingCopy)
+        DiffBarButton(systemImage: "paragraphsign", help: help.invisibles, identifier: "diff.invisibles", isOn: options.showsInvisibles) {
+            change { $0.showsInvisibles.toggle() }
+        }
+        DiffBarButton(systemImage: "arrow.turn.down.left", help: help.wrap, identifier: "diff.wrap", isOn: options.wrapsLines) {
+            change { $0.wrapsLines.toggle() }
+        }
+        DiffBarButton(systemImage: "text.badge.minus", help: help.fewerContext, identifier: "diff.fewerContext") {
             change { $0.contextLines -= 1 }
         }
-        .disabled(options.contextLines <= range.lowerBound)
-        DiffBarButton(systemImage: "arrow.up.left.and.arrow.down.right", help: "More Context Lines (\(options.contextLines))", identifier: "diff.moreContext") {
+        .disabled(options.showsEntireFile || options.contextLines <= help.minimumContext)
+        DiffBarButton(systemImage: "text.badge.plus", help: help.moreContext, identifier: "diff.moreContext") {
             change { $0.contextLines += 1 }
         }
-        .disabled(options.contextLines >= range.upperBound)
-        DiffBarButton(systemImage: "rectangle.split.2x1", help: options.showsSideBySide ? "Show Inline Diff" : "Show Side by Side", identifier: "diff.sideBySide", isOn: options.showsSideBySide) {
+        .disabled(options.showsEntireFile || options.contextLines >= range.upperBound)
+        DiffBarButton(systemImage: "arrow.up.and.down.text.horizontal", help: help.entireFile, identifier: "diff.entireFile", isOn: options.showsEntireFile) {
+            change { $0.showsEntireFile.toggle() }
+        }
+        DiffBarButton(systemImage: "rectangle.split.2x1", help: help.sideBySide, identifier: "diff.sideBySide", isOn: options.showsSideBySide) {
             change { $0.showsSideBySide.toggle() }
         }
+    }
+}
+
+struct DiffViewOptionsHelp: Equatable {
+    let options: DiffSettings
+    let isWorkingCopy: Bool
+
+    var minimumContext: Int {
+        isWorkingCopy ? 1 : DiffSettings.contextLineRange.lowerBound
+    }
+
+    var whitespace: String {
+        if isWorkingCopy { return "Changes always shows whitespace, because staging a hunk or line needs the exact patch" }
+        return options.showsWhitespaceChanges ? "Hide Whitespace Changes (git diff -w)" : "Show Whitespace Changes"
+    }
+
+    var invisibles: String {
+        options.showsInvisibles ? "Hide Invisible Characters" : "Show Invisible Characters (· space, → tab)"
+    }
+
+    var wrap: String {
+        options.wrapsLines ? "Don't Wrap Long Lines" : "Wrap Long Lines"
+    }
+
+    var fewerContext: String {
+        "Fewer Context Lines (git diff -U\(max(options.contextLines - 1, minimumContext)))"
+    }
+
+    var moreContext: String {
+        "More Context Lines (git diff -U\(min(options.contextLines + 1, DiffSettings.contextLineRange.upperBound)))"
+    }
+
+    var entireFile: String {
+        options.showsEntireFile ? "Show Only Changed Lines (git diff -U\(max(options.contextLines, minimumContext)))" : "Show Entire File (git diff -U\(DiffOptions.entireFileContextLines))"
+    }
+
+    var sideBySide: String {
+        options.showsSideBySide ? "Show Inline Diff" : "Show Side by Side"
     }
 }
 
@@ -284,6 +355,7 @@ struct DiffFileHeaderBar: View {
     let toggleRaw: () -> Void
     let jump: (DiffHunkJump.Direction) -> Void
     let options: DiffSettings
+    var isWorkingCopy = false
     let changeOptions: ((inout DiffSettings) -> Void) -> Void
 
     var body: some View {
@@ -298,7 +370,7 @@ struct DiffFileHeaderBar: View {
                 DiffStatusTag(summary: summary)
                 Spacer(minLength: Metrics.Spacing.s)
                 DiffCounts(additions: summary.additions, deletions: summary.deletions)
-                DiffViewOptions(options: options, change: changeOptions)
+                DiffViewOptions(options: options, isWorkingCopy: isWorkingCopy, change: changeOptions)
                 DiffBarButton(systemImage: "doc.plaintext", help: showsRaw ? "Hide Raw Diff Header" : "Show Raw Diff Header", identifier: "diff.rawToggle", isOn: showsRaw, action: toggleRaw)
             }
             .padding(.horizontal, Metrics.Spacing.s)

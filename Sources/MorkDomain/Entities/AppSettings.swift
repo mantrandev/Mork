@@ -27,13 +27,28 @@ public struct DiffSettings: Codable, Hashable, Sendable {
     public var showsWhitespaceChanges: Bool
     public var contextLines: Int
     public var showsSideBySide: Bool
+    public var showsEntireFile: Bool
+    public var wrapsLines: Bool
+    public var showsInvisibles: Bool
 
-    public init(fontSize: Int = 12, tabWidth: Int = 4, showsWhitespaceChanges: Bool = true, contextLines: Int = DiffOptions.defaultContextLines, showsSideBySide: Bool = false) {
+    public init(
+        fontSize: Int = 12,
+        tabWidth: Int = 4,
+        showsWhitespaceChanges: Bool = true,
+        contextLines: Int = DiffOptions.defaultContextLines,
+        showsSideBySide: Bool = false,
+        showsEntireFile: Bool = false,
+        wrapsLines: Bool = false,
+        showsInvisibles: Bool = false
+    ) {
         self.fontSize = fontSize
         self.tabWidth = tabWidth
         self.showsWhitespaceChanges = showsWhitespaceChanges
         self.contextLines = contextLines
         self.showsSideBySide = showsSideBySide
+        self.showsEntireFile = showsEntireFile
+        self.wrapsLines = wrapsLines
+        self.showsInvisibles = showsInvisibles
     }
 
     public init(from decoder: Decoder) throws {
@@ -44,12 +59,15 @@ public struct DiffSettings: Codable, Hashable, Sendable {
             tabWidth: container.value(Int.self, .tabWidth) ?? standard.tabWidth,
             showsWhitespaceChanges: container.value(Bool.self, .showsWhitespaceChanges) ?? standard.showsWhitespaceChanges,
             contextLines: container.value(Int.self, .contextLines) ?? standard.contextLines,
-            showsSideBySide: container.value(Bool.self, .showsSideBySide) ?? standard.showsSideBySide
+            showsSideBySide: container.value(Bool.self, .showsSideBySide) ?? standard.showsSideBySide,
+            showsEntireFile: container.value(Bool.self, .showsEntireFile) ?? standard.showsEntireFile,
+            wrapsLines: container.value(Bool.self, .wrapsLines) ?? standard.wrapsLines,
+            showsInvisibles: container.value(Bool.self, .showsInvisibles) ?? standard.showsInvisibles
         )
     }
 
     public var options: DiffOptions {
-        DiffOptions(contextLines: contextLines, ignoresWhitespace: !showsWhitespaceChanges)
+        DiffOptions(contextLines: showsEntireFile ? DiffOptions.entireFileContextLines : contextLines, ignoresWhitespace: !showsWhitespaceChanges)
     }
 
     public func normalized() -> DiffSettings {
@@ -58,7 +76,10 @@ public struct DiffSettings: Codable, Hashable, Sendable {
             tabWidth: Self.tabWidths.contains(tabWidth) ? tabWidth : DiffSettings().tabWidth,
             showsWhitespaceChanges: showsWhitespaceChanges,
             contextLines: min(max(contextLines, Self.contextLineRange.lowerBound), Self.contextLineRange.upperBound),
-            showsSideBySide: showsSideBySide
+            showsSideBySide: showsSideBySide,
+            showsEntireFile: showsEntireFile,
+            wrapsLines: wrapsLines,
+            showsInvisibles: showsInvisibles
         )
     }
 }

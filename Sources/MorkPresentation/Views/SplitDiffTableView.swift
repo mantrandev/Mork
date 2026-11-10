@@ -34,6 +34,8 @@ struct SplitDiffTableView: NSViewRepresentable {
         scroll.drawsBackground = true
         scroll.backgroundColor = Palette.Surface.window.nsColor
         context.coordinator.table = table
+        scroll.contentView.postsFrameChangedNotifications = true
+        NotificationCenter.default.addObserver(context.coordinator, selector: #selector(Coordinator.visibleWidthChanged), name: NSView.frameDidChangeNotification, object: scroll.contentView)
         context.coordinator.update(document: document, metrics: metrics)
         return scroll
     }
@@ -51,6 +53,14 @@ struct SplitDiffTableView: NSViewRepresentable {
         private var attributed: [Int: NSAttributedString] = [:]
         private var font = NSFont.monospacedSystemFont(ofSize: DiffMetrics.standard.fontSize, weight: .regular)
         private var numberFont = NSFont.monospacedSystemFont(ofSize: DiffMetrics.standard.numberFontSize, weight: .regular)
+        private var wrap: DiffWrapLayout?
+        private var columnCounts: [Int: Int] = [:]
+
+        private var wrapLayout: DiffWrapLayout? {
+            let width = table?.enclosingScrollView?.contentView.bounds.width ?? 0
+            let gutter = numberWidth > 0 ? numberWidth + Metrics.Diff.numberGap : 0
+            return metrics.wrapLayout(textWidth: SplitDiffCell.sideWidth(of: width) - gutter - Metrics.Diff.textInset)
+        }
 
         private var numberWidth: CGFloat {
             guard let document, document.lineNumberDigits > 0 else { return 0 }
@@ -63,6 +73,8 @@ struct SplitDiffTableView: NSViewRepresentable {
             metrics = nextMetrics
             rows = SplitDiff.rows(from: next.lines)
             attributed = [:]
+            columnCounts = [:]
+            wrap = wrapLayout
             font = .monospacedSystemFont(ofSize: nextMetrics.fontSize, weight: .regular)
             numberFont = .monospacedSystemFont(ofSize: nextMetrics.numberFontSize, weight: .regular)
             table.rowHeight = nextMetrics.rowHeight
@@ -81,8 +93,33 @@ struct SplitDiffTableView: NSViewRepresentable {
         }
 
         func tableView(_ tableView: NSTableView, heightOfRow row: Int) -> CGFloat {
-            guard rows.indices.contains(row), case .hunk = rows[row].content else { return metrics.rowHeight }
-            return Metrics.Diff.hunkRow
+            guard rows.indices.contains(row) else { return metrics.rowHeight }
+            switch rows[row].content {
+            case .hunk:
+                return Metrics.Diff.hunkRow
+            case let .pair(left, right):
+                guard let wrap else { return metrics.rowHeight }
+                return wrap.height(forColumns: max(left.map(columns(of:)) ?? 0, right.map(columns(of:)) ?? 0))
+            }
+        }
+
+        @objc func visibleWidthChanged() {
+            guard let table, metrics.wrapsLines else { return }
+            let next = wrapLayout
+            guard next != wrap else { return }
+            wrap = next
+            guard !rows.isEmpty else { return }
+            table.noteHeightOfRows(withIndexesChanged: IndexSet(integersIn: rows.indices))
+            let visible = table.rows(in: table.visibleRect)
+            guard visible.length > 0 else { return }
+            table.reloadData(forRowIndexes: IndexSet(integersIn: visible.location..<(visible.location + visible.length)), columnIndexes: IndexSet(integer: 0))
+        }
+
+        private func columns(of line: DiffLine) -> Int {
+            if let cached = columnCounts[line.id] { return cached }
+            let count = DiffTabs.columns(of: line.text, width: metrics.tabWidth)
+            columnCounts[line.id] = count
+            return count
         }
 
         func tableView(_ tableView: NSTableView, viewFor tableColumn: NSTableColumn?, row: Int) -> NSView? {
@@ -101,7 +138,8 @@ struct SplitDiffTableView: NSViewRepresentable {
                     right: right.map { SplitDiffSide(line: $0, text: text(for: $0)) },
                     font: font,
                     numberFont: numberFont,
-                    numberWidth: numberWidth
+                    numberWidth: numberWidth,
+                    wrap: wrap
                 )
                 return cell
             }
@@ -109,7 +147,7 @@ struct SplitDiffTableView: NSViewRepresentable {
 
         private func text(for line: DiffLine) -> NSAttributedString {
             if let cached = attributed[line.id] { return cached }
-            let result = DiffLineText.make(line, font: font, tabWidth: metrics.tabWidth)
+            let result = DiffLineText.make(line, font: font, tabWidth: metrics.tabWidth, showsInvisibles: metrics.showsInvisibles, wrapLineHeight: metrics.wrapsLines ? metrics.lineHeight : nil)
             attributed[line.id] = result
             return result
         }
@@ -146,7 +184,11 @@ final class SplitDiffCell: NSView {
 
     override var isFlipped: Bool { true }
 
-    func configure(left leftSide: SplitDiffSide?, right rightSide: SplitDiffSide?, font: NSFont, numberFont: NSFont, numberWidth: CGFloat) {
+    static func sideWidth(of width: CGFloat) -> CGFloat {
+        floor(width / 2)
+    }
+
+    func configure(left leftSide: SplitDiffSide?, right rightSide: SplitDiffSide?, font: NSFont, numberFont: NSFont, numberWidth: CGFloat, wrap: DiffWrapLayout? = nil) {
         hasLeft = leftSide != nil
         hasRight = rightSide != nil
         left.isHidden = leftSide == nil
@@ -154,10 +196,10 @@ final class SplitDiffCell: NSView {
         if let leftSide {
             var shown = leftSide.line
             shown.newNumber = leftSide.line.oldNumber
-            left.configure(line: shown, text: leftSide.text, font: font, numberFont: numberFont, numberWidth: numberWidth, numberColumns: 1, source: nil, isSelected: false, allowsTextSelection: true)
+            left.configure(line: shown, text: leftSide.text, font: font, numberFont: numberFont, numberWidth: numberWidth, numberColumns: 1, source: nil, isSelected: false, allowsTextSelection: true, wrap: wrap)
         }
         if let rightSide {
-            right.configure(line: rightSide.line, text: rightSide.text, font: font, numberFont: numberFont, numberWidth: numberWidth, numberColumns: 1, source: nil, isSelected: false, allowsTextSelection: true)
+            right.configure(line: rightSide.line, text: rightSide.text, font: font, numberFont: numberFont, numberWidth: numberWidth, numberColumns: 1, source: nil, isSelected: false, allowsTextSelection: true, wrap: wrap)
         }
         needsLayout = true
         needsDisplay = true
@@ -165,7 +207,7 @@ final class SplitDiffCell: NSView {
 
     override func layout() {
         super.layout()
-        let half = floor(bounds.width / 2)
+        let half = Self.sideWidth(of: bounds.width)
         left.frame = NSRect(x: 0, y: 0, width: half, height: bounds.height)
         right.frame = NSRect(x: half + 1, y: 0, width: max(0, bounds.width - half - 1), height: bounds.height)
     }

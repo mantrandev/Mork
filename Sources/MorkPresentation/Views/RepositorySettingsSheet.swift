@@ -159,6 +159,6 @@ private struct RepositorySettingsPresentation: ViewModifier {
     func body(content: Content) -> some View {
         content
             .sheet(item: $viewModel.repositorySettings) { RepositorySettingsSheet(session: $0) }
-            .environment(\.diffMetrics, DiffMetrics(fontSize: CGFloat(viewModel.settings.diff.fontSize), tabWidth: viewModel.settings.diff.tabWidth))
+            .environment(\.diffMetrics, DiffMetrics(settings: viewModel.settings.diff))
     }
 }

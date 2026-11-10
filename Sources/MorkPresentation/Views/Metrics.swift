@@ -444,6 +444,8 @@ enum Metrics {
         static let textInset: CGFloat = 8
         static let textPadding: CGFloat = 2
         static let columnSlack: CGFloat = 40
+        static let wrapSlack: CGFloat = 1
+        static let wrapMinimumColumns: CGFloat = 20
         static let selectionBar: CGFloat = 3
         static let selectionOpacity: Double = 0.2
         static let minimumCardWidth: CGFloat = 320

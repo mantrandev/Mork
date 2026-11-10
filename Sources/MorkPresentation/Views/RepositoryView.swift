@@ -564,7 +564,7 @@ private struct RepositoryDetail: View {
                                     .id(ObjectIdentifier(resolver))
                                     .frame(maxHeight: .infinity)
                             } else {
-                                DetailView(viewModel: viewModel)
+                                DetailView(viewModel: viewModel, showsFileHeaderBar: true)
                                     .frame(maxHeight: .infinity)
                             }
                             Hairline()
