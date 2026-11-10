@@ -398,6 +398,11 @@ extension AppViewModel {
     func deactivate(_ tab: RepositoryViewModel) {
         tab.stopWatching()
         tab.stopAutoFetch()
+        tab.releaseMemory()
+    }
+
+    public func releaseMemory() {
+        for tab in tabs { tab.releaseMemory() }
     }
 
     private func rememberClosed(_ url: URL) {

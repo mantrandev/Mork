@@ -78,6 +78,13 @@ public final class CommitRangeChangesViewModel {
         showSelection()
     }
 
+    public func releaseMemory() {
+        listings = [:]
+        listingOrder = []
+        diffs = [:]
+        diffOrder = []
+    }
+
     public func waitForFiles() async {
         await listTask?.value
     }

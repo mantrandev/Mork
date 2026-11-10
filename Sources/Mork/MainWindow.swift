@@ -23,6 +23,9 @@ struct MainWindow: View {
         }
         .frame(minWidth: 900, minHeight: 680)
         .task { await start() }
+        .onReceive(NotificationCenter.default.publisher(for: MemoryPressureMonitor.didRaise)) { _ in
+            model?.releaseMemory()
+        }
         .onDisappear {
             if model === primary { Self.isPrimaryShown = false }
         }
