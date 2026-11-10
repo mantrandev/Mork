@@ -21,7 +21,9 @@ struct InteractiveRebaseSheet: View {
                     ForEach(session.displayedSteps) { step in
                         RebaseStepRow(session: session, step: step)
                             .frame(height: Metrics.Rebase.rowHeight)
+                            .background(TableSelectionHighlightOff())
                             .listRowInsets(EdgeInsets(top: 0, leading: Metrics.Spacing.s, bottom: 0, trailing: Metrics.Spacing.s))
+                            .listRowBackground(session.selectedStepID == step.id ? RebaseStepSelection() : nil)
                             .tag(step.id)
                     }
                     .onMove { session.moveDisplayed(fromOffsets: $0, toOffset: $1) }
@@ -541,6 +543,42 @@ private struct TodoPreview: View {
                 }
             }
             .padding(Metrics.Sheet.padding)
+        }
+    }
+}
+
+struct RebaseStepSelection: View {
+    static func opacity(isSelected: Bool) -> Double {
+        isSelected ? Palette.Ink.laneFill : 0
+    }
+
+    var body: some View {
+        RoundedRectangle(cornerRadius: Metrics.Radius.control, style: .continuous)
+            .fill(Palette.Text.primary.color.opacity(Self.opacity(isSelected: true)))
+            .padding(.horizontal, Metrics.Spacing.s)
+    }
+}
+
+private struct TableSelectionHighlightOff: NSViewRepresentable {
+    func makeNSView(context: Context) -> HookView {
+        HookView()
+    }
+
+    func updateNSView(_ view: HookView, context: Context) {
+        view.apply()
+    }
+
+    final class HookView: NSView {
+        override func viewDidMoveToWindow() {
+            super.viewDidMoveToWindow()
+            apply()
+        }
+
+        func apply() {
+            var ancestor = superview
+            while let view = ancestor, !(view is NSTableView) { ancestor = view.superview }
+            guard let table = ancestor as? NSTableView, table.selectionHighlightStyle != .none else { return }
+            table.selectionHighlightStyle = .none
         }
     }
 }
