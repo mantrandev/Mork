@@ -4,7 +4,6 @@ import SwiftUI
 struct InteractiveRebaseSheet: View {
     @Bindable var session: InteractiveRebaseViewModel
     @Environment(\.dismiss) private var dismiss
-    @State private var detailsTab = RebaseDetailsTab.commit
 
     var body: some View {
         VStack(spacing: 0) {
@@ -40,7 +39,7 @@ struct InteractiveRebaseSheet: View {
                 .listStyle(.inset(alternatesRowBackgrounds: true))
                 .accessibilityIdentifier("rebaseSheet.steps")
             } main: {
-                RebaseDetails(session: session, tab: $detailsTab)
+                RebaseDetails(session: session)
             }
             Hairline()
             RebaseFooter(session: session) { dismiss() }
@@ -53,11 +52,6 @@ struct InteractiveRebaseSheet: View {
             RebaseMessageSheet(session: session, draft: draft)
         }
     }
-}
-
-private enum RebaseDetailsTab: String, CaseIterable {
-    case commit = "Commit"
-    case todo = "git-rebase-todo"
 }
 
 private extension RebaseAction {
@@ -302,13 +296,16 @@ struct RebaseMessageSheet: View {
 
 private struct RebaseDetails: View {
     let session: InteractiveRebaseViewModel
-    @Binding var tab: RebaseDetailsTab
+    @AppStorage("rebase.detailsTab") private var storedTab = RebaseDetailsTab.changes
 
     var body: some View {
         VStack(spacing: 0) {
             HStack {
-                Picker("Details", selection: $tab) {
-                    ForEach(RebaseDetailsTab.allCases, id: \.self) { Text($0.rawValue).tag($0) }
+                Picker("Details", selection: Binding(
+                    get: { session.detailsTab },
+                    set: { session.detailsTab = $0; storedTab = $0 }
+                )) {
+                    ForEach(RebaseDetailsTab.allCases, id: \.self) { Text($0.title).tag($0) }
                 }
                 .pickerStyle(.segmented)
                 .labelsHidden()
@@ -319,15 +316,142 @@ private struct RebaseDetails: View {
             .padding(.horizontal, Metrics.Sheet.padding)
             .padding(.vertical, Metrics.Spacing.s)
             Hairline()
-            switch tab {
+            switch session.detailsTab {
             case .commit:
                 if let step = session.selectedStep {
                     RebaseCommitDetails(session: session, step: step)
                 } else {
                     EmptyStateView("No Commit Selected", systemImage: "smallcircle.filled.circle", message: "Select a commit to see its details.")
                 }
+            case .changes:
+                if let step = session.selectedStep {
+                    RebaseChanges(session: session, commit: step.commit)
+                } else {
+                    EmptyStateView("No Commit Selected", systemImage: "smallcircle.filled.circle", message: "Select a commit to see its changes.")
+                }
             case .todo:
                 TodoPreview(session: session)
+            }
+        }
+        .onAppear { session.detailsTab = storedTab }
+    }
+}
+
+private struct RebaseChanges: View {
+    @Bindable var session: InteractiveRebaseViewModel
+    let commit: Commit
+
+    var body: some View {
+        VStack(spacing: 0) {
+            CommitSummaryBar(commit: commit)
+            Hairline()
+            PaneSplit(
+                .horizontal,
+                key: PaneSplitKey.rebaseChangesFilesWidth,
+                defaultSize: Metrics.CommitDetails.filesPaneIdealWidth,
+                range: Metrics.CommitDetails.filesPaneMinimumWidth...Metrics.CommitDetails.filesPaneMaximumWidth,
+                mainMinimum: Metrics.CommitDetails.diffMinimumWidth,
+                identifier: "rebaseChanges.resize"
+            ) {
+                VStack(spacing: 0) {
+                    FileFilterRow(text: $session.changesFilter, identifier: "rebaseChanges.filter") {
+                        let next: FileListMode = session.changesFileListMode == .flat ? .tree : .flat
+                        DiffBarButton(systemImage: next.systemImage, help: next.title, identifier: "rebaseChanges.mode") {
+                            session.changesFileListMode = next
+                        }
+                        .accessibilityValue(session.changesFileListMode.rawValue)
+                    }
+                    Hairline()
+                    files
+                }
+            } main: {
+                RebaseChangesDiff(session: session)
+            }
+        }
+        .accessibilityIdentifier("rebaseSheet.changes")
+    }
+
+    @ViewBuilder
+    private var files: some View {
+        switch session.commitFiles {
+        case let .loaded(files) where !files.isEmpty:
+            fileList
+        case .loaded:
+            EmptyStateView("No File Changes", systemImage: "doc")
+        case let .failed(message):
+            EmptyStateView("Could Not Load Commit", systemImage: "exclamationmark.triangle", message: message)
+        case .loading, nil:
+            Color.clear
+        }
+    }
+
+    private var fileList: some View {
+        let selection = session.selectedChangesPath
+        let firstID = session.changesRows.first?.id
+        return List(selection: $session.selectedChangesPath) {
+            ForEach(session.changesRows) { row in
+                if let file = row.file {
+                    CommitFileListRowView(row: row, isLFS: false)
+                        .background { if file.path == selection || row.id == firstID { InkSelectionTableStyle() } }
+                        .listRowBackground(file.path == selection ? Palette.Accent.tint.color : nil)
+                        .tag(file.path)
+                        .listRowInsets(Metrics.listRowInsets)
+                        .listRowSeparator(.hidden)
+                } else {
+                    CommitFileListRowView(row: row, isLFS: false)
+                        .selectionDisabled()
+                        .listRowInsets(Metrics.listRowInsets)
+                        .listRowSeparator(.hidden)
+                }
+            }
+        }
+        .listStyle(.inset)
+        .environment(\.defaultMinListRowHeight, Metrics.Row.list)
+        .accessibilityIdentifier("rebaseChanges.files")
+    }
+}
+
+private struct RebaseChangesDiff: View {
+    let session: InteractiveRebaseViewModel
+    @Environment(\.diffMetrics) private var metrics
+    @State private var showsRaw = false
+    @State private var hunkJump = DiffHunkJump(id: 0, direction: .next)
+
+    var body: some View {
+        switch session.changesDiff {
+        case nil where session.selectedChangesFile == nil:
+            EmptyStateView("No File Selected", systemImage: "doc.text", message: "Select a file to see its changes.")
+        case nil, .loading:
+            ProgressView()
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+        case let .failed(message):
+            EmptyStateView("Could Not Load", systemImage: "exclamationmark.triangle", message: message)
+        case let .loaded(document):
+            if document.lines.isEmpty {
+                EmptyStateView("No Differences", systemImage: "equal")
+            } else if document.isCollapsed {
+                LargeDiffPlaceholder(lineCount: document.totalLines, show: session.showLargeChangesDiff)
+            } else if case let .file(header, meta, additions, deletions)? = document.blocks.first, document.blocks.dropFirst().allSatisfy({ if case .file = $0 { false } else { true } }) {
+                let options = session.diffSettings
+                VStack(spacing: 0) {
+                    DiffFileHeaderBar(
+                        summary: DiffFileSummary(header: ([header] + meta).map(\.text), additions: additions, deletions: deletions),
+                        rawLines: ([header] + meta).map(\.text),
+                        showsRaw: showsRaw,
+                        toggleRaw: { showsRaw.toggle() },
+                        jump: { direction in hunkJump = DiffHunkJump(id: hunkJump.id + 1, direction: direction) },
+                        options: options,
+                        changeOptions: { session.changeDiffSettings($0) }
+                    )
+                    Hairline()
+                    if options.showsSideBySide {
+                        SplitDiffTableView(document: document, metrics: metrics)
+                    } else {
+                        DiffText(document: document, hidesFileCards: true, hunkJump: hunkJump)
+                    }
+                }
+            } else {
+                DiffText(document: document, showsRawDiff: showsRaw, toggleRawDiff: { showsRaw.toggle() })
             }
         }
     }

@@ -153,6 +153,18 @@ extension RepositoryViewModel {
         return states
     }
 
+    func fullDiffState(of file: CommitFileChange, in commit: Commit) async -> InlineDiffState {
+        let tabWidth = settings.diff.tabWidth
+        do {
+            let text = try await dependencies.loadCommitFileDiff.execute(commit: commit, file: file)
+            return .loaded(await Task.detached(priority: .userInitiated) {
+                DiffDocument.make(text: text, patch: nil, isCommit: false, tabWidth: tabWidth, showsLarge: true)
+            }.value)
+        } catch {
+            return .failed(error.localizedDescription)
+        }
+    }
+
     private func claimInlineDiffs(for commit: Commit) {
         guard inlineDiffs.hash != commit.hash else { return }
         resetInlineDiffs()

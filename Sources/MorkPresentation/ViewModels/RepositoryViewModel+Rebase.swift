@@ -30,7 +30,12 @@ extension RepositoryViewModel {
                     },
                     diffs: { [weak self] files, commit in
                         await self?.inlineDiffStates(of: files, in: commit) ?? [:]
-                    }
+                    },
+                    fullDiff: { [weak self] file, commit in
+                        await self?.fullDiffState(of: file, in: commit) ?? .failed(CancellationError().localizedDescription)
+                    },
+                    settings: { [weak self] in self?.settings.diff ?? DiffSettings() },
+                    changeSettings: { [weak self] change in self?.changeDiffSettings(change) }
                 )
             ) { [weak self] steps, options in
                 await self?.runInteractiveRebase(onto: base, steps: steps, options: options)

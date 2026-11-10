@@ -54,6 +54,23 @@ public struct RebaseMessageDraft: Identifiable, Equatable, Sendable {
 struct RebaseCommitChanges {
     let summary: @MainActor (Commit) async -> Result<CommitSummary, Error>
     let diffs: @MainActor ([CommitFileChange], Commit) async -> [String: InlineDiffState]
+    let fullDiff: @MainActor (CommitFileChange, Commit) async -> InlineDiffState
+    let settings: @MainActor () -> DiffSettings
+    let changeSettings: @MainActor ((inout DiffSettings) -> Void) -> Void
+}
+
+public enum RebaseDetailsTab: String, CaseIterable, Sendable {
+    case commit
+    case changes
+    case todo
+
+    public var title: String {
+        switch self {
+        case .commit: "Commit"
+        case .changes: "Changes"
+        case .todo: "git-rebase-todo"
+        }
+    }
 }
 
 enum RebaseCommitFiles: Equatable {
@@ -86,6 +103,20 @@ public final class InteractiveRebaseViewModel: Identifiable {
     private(set) var commitFiles: RebaseCommitFiles?
     private(set) var commitTabRows: [CommitTabRow] = []
     public private(set) var areAllInlineDiffsExpanded = false
+    public var detailsTab = RebaseDetailsTab.commit {
+        didSet { if detailsTab != oldValue { loadSelectedChangesDiff() } }
+    }
+    public var changesFilter = "" {
+        didSet { if changesFilter != oldValue { rebuildCommitTabRows() } }
+    }
+    public var changesFileListMode = FileListMode.flat {
+        didSet { if changesFileListMode != oldValue { rebuildCommitTabRows() } }
+    }
+    public var selectedChangesPath: String? {
+        didSet { if selectedChangesPath != oldValue { loadSelectedChangesDiff() } }
+    }
+    public private(set) var changesRows: [CommitFileListRow] = []
+    private(set) var changesDiff: InlineDiffState?
 
     @ObservationIgnored private let run: Run
     @ObservationIgnored private let changes: RebaseCommitChanges?
@@ -93,6 +124,7 @@ public final class InteractiveRebaseViewModel: Identifiable {
     @ObservationIgnored private var diffsByCommit: [String: [String: InlineDiffState]] = [:]
     @ObservationIgnored private var expanded: Set<String> = []
     @ObservationIgnored private var tasks: [UUID: Task<Void, Never>] = [:]
+    @ObservationIgnored private var changesRowsSource: CommitFileRowsSource?
 
     public convenience init(base: RebaseBase, branchName: String, steps: [RebaseStep], skippedMerges: [Commit] = [], hasUncommittedChanges: Bool, run: @escaping Run) {
         self.init(base: base, branchName: branchName, steps: steps, skippedMerges: skippedMerges, hasUncommittedChanges: hasUncommittedChanges, changes: nil, run: run)
@@ -247,6 +279,36 @@ public final class InteractiveRebaseViewModel: Identifiable {
         rebuildCommitTabRows()
     }
 
+    public var selectedChangesFile: CommitFileChange? {
+        guard let path = selectedChangesPath, case let .loaded(files) = commitFiles else { return nil }
+        return files.first { $0.path == path }
+    }
+
+    public var diffSettings: DiffSettings { changes?.settings() ?? DiffSettings() }
+
+    public func changeDiffSettings(_ change: (inout DiffSettings) -> Void) {
+        guard let changes else { return }
+        let previous = changes.settings().options
+        changes.changeSettings(change)
+        guard changes.settings().options != previous, let commit = selectedStep?.commit else { return }
+        diffsByCommit = [:]
+        if case let .loaded(files) = commitFiles { loadDiffs(files.filter { expanded.contains($0.path) }, in: commit) }
+        loadSelectedChangesDiff()
+    }
+
+    public func showLargeChangesDiff() {
+        guard let changes, let commit = selectedStep?.commit, let file = selectedChangesFile,
+              case let .loaded(document)? = diffsByCommit[commit.hash]?[file.path], document.isCollapsed else { return }
+        diffsByCommit[commit.hash, default: [:]][file.path] = .loading
+        rebuildCommitTabRows()
+        track { [weak self] in
+            let state = await changes.fullDiff(file, commit)
+            guard let self else { return }
+            self.diffsByCommit[commit.hash, default: [:]][file.path] = state
+            self.rebuildCommitTabRows()
+        }
+    }
+
     public func waitForCommitChanges() async {
         while let task = tasks.values.first {
             await task.value
@@ -265,7 +327,16 @@ public final class InteractiveRebaseViewModel: Identifiable {
                 case let .failure(error): self.filesByCommit[commit.hash] = .failed(error.localizedDescription)
                 }
                 self.rebuildCommitTabRows()
+                self.loadSelectedChangesDiff()
             }
+        }
+        rebuildCommitTabRows()
+        loadSelectedChangesDiff()
+    }
+
+    private func loadSelectedChangesDiff() {
+        if detailsTab == .changes, let commit = selectedStep?.commit, let file = selectedChangesFile {
+            loadDiffs([file], in: commit)
         }
         rebuildCommitTabRows()
     }
@@ -299,6 +370,18 @@ public final class InteractiveRebaseViewModel: Identifiable {
         if rows != commitTabRows { commitTabRows = rows }
         let allExpanded = !files.isEmpty && files.allSatisfy { expanded.contains($0.path) }
         if allExpanded != areAllInlineDiffsExpanded { areAllInlineDiffsExpanded = allExpanded }
+        let source = CommitFileRowsSource(files: files, mode: changesFileListMode, filter: changesFilter)
+        if source != changesRowsSource {
+            changesRowsSource = source
+            let changed = CommitFileList.rows(files, mode: changesFileListMode, filter: changesFilter)
+            if changed != changesRows { changesRows = changed }
+        }
+        if let first = files.first, !files.contains(where: { $0.path == selectedChangesPath }) {
+            selectedChangesPath = first.path
+            return
+        }
+        let shown = selectedChangesPath.flatMap { diffs[$0] }
+        if shown != changesDiff { changesDiff = shown }
     }
 
     private func track(_ work: @escaping @MainActor () async -> Void) {
