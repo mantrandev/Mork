@@ -282,8 +282,7 @@ struct DiffViewOptions: View {
 
     var body: some View {
         let help = DiffViewOptionsHelp(options: options, isWorkingCopy: isWorkingCopy)
-        let range = DiffSettings.contextLineRange
-        DiffBarButton(systemImage: "space", help: help.whitespace, identifier: "diff.whitespace", isOn: options.showsWhitespaceChanges && !isWorkingCopy) {
+        DiffBarButton(systemImage: "space", help: help.whitespace, identifier: "diff.whitespace", isOn: help.showsWhitespace) {
             change { $0.showsWhitespaceChanges.toggle() }
         }
         .disabled(isWorkingCopy)
@@ -296,11 +295,11 @@ struct DiffViewOptions: View {
         DiffBarButton(systemImage: "text.badge.minus", help: help.fewerContext, identifier: "diff.fewerContext") {
             change { $0.contextLines -= 1 }
         }
-        .disabled(options.showsEntireFile || options.contextLines <= help.minimumContext)
+        .disabled(!help.canShowFewerContext)
         DiffBarButton(systemImage: "text.badge.plus", help: help.moreContext, identifier: "diff.moreContext") {
             change { $0.contextLines += 1 }
         }
-        .disabled(options.showsEntireFile || options.contextLines >= range.upperBound)
+        .disabled(!help.canShowMoreContext)
         DiffBarButton(systemImage: "arrow.up.and.down.text.horizontal", help: help.entireFile, identifier: "diff.entireFile", isOn: options.showsEntireFile) {
             change { $0.showsEntireFile.toggle() }
         }
@@ -317,6 +316,19 @@ struct DiffViewOptionsHelp: Equatable {
     var minimumContext: Int {
         isWorkingCopy ? 1 : DiffSettings.contextLineRange.lowerBound
     }
+
+    var showsWhitespace: Bool {
+        options.showsWhitespaceChanges && !isWorkingCopy
+    }
+
+    var canShowFewerContext: Bool {
+        !options.showsEntireFile && options.contextLines > minimumContext
+    }
+
+    var canShowMoreContext: Bool {
+        !options.showsEntireFile && options.contextLines < DiffSettings.contextLineRange.upperBound
+    }
+
 
     var whitespace: String {
         if isWorkingCopy { return "Changes always shows whitespace, because staging a hunk or line needs the exact patch" }
@@ -348,6 +360,43 @@ struct DiffViewOptionsHelp: Equatable {
     }
 }
 
+enum DiffHeaderLayout {
+    static func isCompact(width: CGFloat) -> Bool {
+        width < Metrics.Diff.compactHeaderWidth
+    }
+}
+
+enum DiffViewOptionsMenu {
+    static func entries(options: DiffSettings, isWorkingCopy: Bool, change: @escaping ((inout DiffSettings) -> Void) -> Void) -> [MenuEntry] {
+        let help = DiffViewOptionsHelp(options: options, isWorkingCopy: isWorkingCopy)
+        return [
+            MenuEntry(title: "Show Whitespace Changes", isChecked: help.showsWhitespace, identifier: "diff.menu.whitespace", isEnabled: !isWorkingCopy) { change { $0.showsWhitespaceChanges.toggle() } },
+            MenuEntry(title: "Show Invisible Characters", isChecked: options.showsInvisibles, identifier: "diff.menu.invisibles") { change { $0.showsInvisibles.toggle() } },
+            MenuEntry(title: "Wrap Long Lines", isChecked: options.wrapsLines, identifier: "diff.menu.wrap") { change { $0.wrapsLines.toggle() } },
+            .separator,
+            MenuEntry(title: help.fewerContext, identifier: "diff.menu.fewerContext", isEnabled: help.canShowFewerContext) { change { $0.contextLines -= 1 } },
+            MenuEntry(title: help.moreContext, identifier: "diff.menu.moreContext", isEnabled: help.canShowMoreContext) { change { $0.contextLines += 1 } },
+            MenuEntry(title: "Show Entire File (git diff -U\(DiffOptions.entireFileContextLines))", isChecked: options.showsEntireFile, identifier: "diff.menu.entireFile") { change { $0.showsEntireFile.toggle() } },
+            .separator,
+            MenuEntry(title: "Side by Side", isChecked: options.showsSideBySide, identifier: "diff.menu.sideBySide") { change { $0.showsSideBySide.toggle() } }
+        ]
+    }
+}
+
+struct DiffViewOptionsMenuButton: View {
+    let options: DiffSettings
+    var isWorkingCopy = false
+    let change: ((inout DiffSettings) -> Void) -> Void
+    @State private var dropdown = DropdownPanel()
+
+    var body: some View {
+        DiffBarButton(systemImage: "slider.horizontal.3", help: "Diff View Options", identifier: "diff.options", isOn: dropdown.isShown) {
+            dropdown.show(identifier: "diff.optionsMenu", minimumWidth: Metrics.Diff.optionsMenuWidth, DiffViewOptionsMenu.entries(options: options, isWorkingCopy: isWorkingCopy, change: change))
+        }
+        .background(DropdownAnchorView(panel: dropdown))
+    }
+}
+
 struct DiffFileHeaderBar: View {
     let summary: DiffFileSummary
     let rawLines: [String]
@@ -357,6 +406,7 @@ struct DiffFileHeaderBar: View {
     let options: DiffSettings
     var isWorkingCopy = false
     let changeOptions: ((inout DiffSettings) -> Void) -> Void
+    @State private var isCompact = false
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
@@ -370,11 +420,16 @@ struct DiffFileHeaderBar: View {
                 DiffStatusTag(summary: summary)
                 Spacer(minLength: Metrics.Spacing.s)
                 DiffCounts(additions: summary.additions, deletions: summary.deletions)
-                DiffViewOptions(options: options, isWorkingCopy: isWorkingCopy, change: changeOptions)
+                if isCompact {
+                    DiffViewOptionsMenuButton(options: options, isWorkingCopy: isWorkingCopy, change: changeOptions)
+                } else {
+                    DiffViewOptions(options: options, isWorkingCopy: isWorkingCopy, change: changeOptions)
+                }
                 DiffBarButton(systemImage: "doc.plaintext", help: showsRaw ? "Hide Raw Diff Header" : "Show Raw Diff Header", identifier: "diff.rawToggle", isOn: showsRaw, action: toggleRaw)
             }
             .padding(.horizontal, Metrics.Spacing.s)
             .frame(height: Metrics.CommitDetails.diffHeaderHeight)
+            .onGeometryChange(for: Bool.self, of: { DiffHeaderLayout.isCompact(width: $0.size.width) }, action: { isCompact = $0 })
             if let detail = DiffFileCard.detail(of: summary) {
                 Text(detail)
                     .font(Metrics.Font.monoCaption)
