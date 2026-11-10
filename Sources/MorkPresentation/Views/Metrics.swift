@@ -447,6 +447,8 @@ enum Metrics {
         static let columnSlack: CGFloat = 40
         static let wrapSlack: CGFloat = 1
         static let wrapMinimumColumns: CGFloat = 20
+        static let compactHeaderWidth: CGFloat = 440
+        static let optionsMenuWidth: CGFloat = 380
         static let selectionBar: CGFloat = 3
         static let selectionOpacity: Double = 0.2
         static let minimumCardWidth: CGFloat = 320
