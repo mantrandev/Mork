@@ -147,7 +147,7 @@ struct SplitDiffTableView: NSViewRepresentable {
 
         private func text(for line: DiffLine) -> NSAttributedString {
             if let cached = attributed[line.id] { return cached }
-            let result = DiffLineText.make(line, font: font, tabWidth: metrics.tabWidth, showsInvisibles: metrics.showsInvisibles, wrapLineHeight: metrics.wrapsLines ? metrics.lineHeight : nil)
+            let result = DiffLineText.make(line, font: font, tabWidth: metrics.tabWidth, showsInvisibles: metrics.showsInvisibles, prefixed: false, wrapLineHeight: metrics.wrapsLines ? metrics.lineHeight : nil)
             attributed[line.id] = result
             return result
         }

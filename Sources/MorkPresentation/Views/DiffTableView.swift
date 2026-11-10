@@ -474,8 +474,8 @@ private enum DiffCellID {
 }
 
 enum DiffLineText {
-    static func make(_ line: DiffLine, font: NSFont, tabWidth: Int, showsInvisibles: Bool = false, wrapLineHeight: CGFloat? = nil) -> NSAttributedString {
-        let expanded = DiffTabs.expand(line.text, changed: line.changed, width: tabWidth, marksInvisiblesAfter: showsInvisibles ? invisiblesStart(of: line) : nil)
+    static func make(_ line: DiffLine, font: NSFont, tabWidth: Int, showsInvisibles: Bool = false, prefixed: Bool = true, wrapLineHeight: CGFloat? = nil) -> NSAttributedString {
+        let expanded = DiffTabs.expand(line.text, changed: line.changed, width: tabWidth, marksInvisiblesAfter: showsInvisibles ? invisiblesStart(of: line, prefixed: prefixed) : nil)
         let string = expanded.text.isEmpty ? " " : expanded.text
         let color = line.kind == .meta ? Palette.Text.secondary.nsColor : Palette.Text.primary.nsColor
         let result = NSMutableAttributedString(string: string, attributes: [.font: font, .foregroundColor: color])
@@ -498,11 +498,11 @@ enum DiffLineText {
         return result
     }
 
-    static func invisiblesStart(of line: DiffLine) -> Int? {
+    static func invisiblesStart(of line: DiffLine, prefixed: Bool = true) -> Int? {
         switch line.kind {
-        case .addition, .deletion: 1
+        case .addition, .deletion: prefixed ? 1 : 0
         case .context where line.text.hasPrefix("\\"): nil
-        case .context: line.oldNumber == nil && line.newNumber != nil ? 0 : 1
+        case .context: !prefixed || (line.oldNumber == nil && line.newNumber != nil) ? 0 : 1
         case .hunk, .meta: nil
         }
     }
