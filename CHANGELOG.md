@@ -1,5 +1,11 @@
 # Changelog
 
+## v0.0.7 (2026-11-11)
+
+### Sidebar
+
+- Selecting a tag or branch whose commit is far down the history now loads History until the commit is listed, then selects it and scrolls to it. Before, older tags selected the commit without showing its row.
+
 ## v0.0.6 (2026-11-11)
 
 ### History
