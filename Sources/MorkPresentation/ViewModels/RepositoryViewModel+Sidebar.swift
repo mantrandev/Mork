@@ -219,7 +219,18 @@ extension RepositoryViewModel {
             return
         }
         guard !Task.isCancelled, sidebarItem == selection else { return }
+        await loadHistory(through: target.hash)
+        guard !Task.isCancelled, sidebarItem == selection else { return }
         revealLoaded(loadedCommit(hash: target.hash) ?? target)
+    }
+
+    private func loadHistory(through hash: String) async {
+        while loadedCommit(hash: hash) == nil, hasMoreHistory, !Task.isCancelled {
+            let loaded = historyRows.count
+            loadMoreHistory()
+            await waitForHistoryPage()
+            if historyRows.count == loaded { return }
+        }
     }
 
     private func revealLoaded(_ commit: Commit) {
