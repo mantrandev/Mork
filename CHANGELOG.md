@@ -1,5 +1,13 @@
 # Changelog
 
+## v0.0.6 (2026-11-11)
+
+### History
+
+- A local branch and its remote with the same name share one badge, marked with a cloud.
+- Long branch names shrink in the middle instead of folding into +N. Only badges that still do not fit fold into +N.
+- The commit subject starts right after the badges, with no gap.
+
 ## v0.0.5 (2026-11-11)
 
 ### History
