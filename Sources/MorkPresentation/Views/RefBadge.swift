@@ -19,7 +19,7 @@ struct RefBadge: View {
                     .fill(ink)
                     .frame(width: Metrics.Badge.borderWidth)
             }
-            Text(title)
+            Text(Self.title(for: label))
                 .font(Metrics.Font.caption.weight(isCurrent || isDetached ? .bold : .medium))
                 .padding(.horizontal, Metrics.Badge.padding)
         }
@@ -47,8 +47,8 @@ struct RefBadge: View {
         }
     }
 
-    private var title: String {
-        label.others.isEmpty ? label.name : "\(label.name) +\(label.others.count)"
+    nonisolated static func title(for label: RefLabel) -> String {
+        label.kind == .tag && !label.others.isEmpty ? "\(label.others.count + 1) tags" : label.name
     }
 
     private var help: String {
