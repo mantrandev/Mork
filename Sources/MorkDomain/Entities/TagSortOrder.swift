@@ -13,7 +13,7 @@ public enum TagSortOrder: String, Codable, CaseIterable, Sendable {
         case .alphabeticalFoldersFirst: "Alphabetically, folders on top"
         case .alphabeticalDescending: "Alphabetically backward"
         case .alphabeticalDescendingFoldersFirst: "Alphabetically backward, folders on top"
-        case .recentlyUsed: "Recently used (deprecated)"
+        case .recentlyUsed: "Recently used"
         }
     }
 }

@@ -8,7 +8,7 @@ public struct SidebarOptions: Codable, Hashable, Sendable {
     public var recentlyUsedRemoteBranches: [String]
 
     public init(
-        tagSortOrder: TagSortOrder = .alphabeticalFoldersFirst,
+        tagSortOrder: TagSortOrder = .recentlyUsed,
         branchSortOrder: BranchSortOrder = .alphabeticalMainAndFoldersFirst,
         remoteBranchSortOrder: BranchSortOrder = .alphabeticalMainAndFoldersFirst,
         recentlyUsedBranches: [String] = [],
@@ -24,7 +24,7 @@ public struct SidebarOptions: Codable, Hashable, Sendable {
     public init(from decoder: Decoder) throws {
         let values = try decoder.container(keyedBy: CodingKeys.self)
         self.init(
-            tagSortOrder: try values.decodeIfPresent(TagSortOrder.self, forKey: .tagSortOrder) ?? .alphabeticalFoldersFirst,
+            tagSortOrder: try values.decodeIfPresent(TagSortOrder.self, forKey: .tagSortOrder) ?? .recentlyUsed,
             branchSortOrder: try values.decodeIfPresent(BranchSortOrder.self, forKey: .branchSortOrder) ?? .alphabeticalMainAndFoldersFirst,
             remoteBranchSortOrder: try values.decodeIfPresent(BranchSortOrder.self, forKey: .remoteBranchSortOrder) ?? .alphabeticalMainAndFoldersFirst,
             recentlyUsedBranches: try values.decodeIfPresent([String].self, forKey: .recentlyUsedBranches) ?? [],

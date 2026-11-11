@@ -30,7 +30,7 @@ struct RemotesSectionMenu: View {
         Divider()
         Text("Sort Branches:")
         ForEach(BranchSortOrder.allCases, id: \.self) { order in
-            Toggle(order == .recentlyUsed ? "Recently used (deprecated)" : order.title, isOn: Binding(
+            Toggle(order.title, isOn: Binding(
                 get: { viewModel.remoteBranchSortOrder == order },
                 set: { if $0 { Task { await viewModel.setRemoteBranchSortOrder(order) } } }
             ))
