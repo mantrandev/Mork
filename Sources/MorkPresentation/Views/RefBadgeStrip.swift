@@ -3,12 +3,19 @@ import SwiftUI
 struct RefBadgeStrip: View {
     let labels: [RefLabel]
     let lane: Int
+    let menus: HistoryRefMenus
 
     var body: some View {
         ViewThatFits(in: .horizontal) {
             ForEach(Array(Self.candidates(labels).enumerated()), id: \.offset) { _, candidate in
                 HStack(spacing: Metrics.Spacing.xs) {
-                    ForEach(candidate, id: \.self) { RefBadge(label: $0, lane: lane).fixedSize() }
+                    ForEach(candidate, id: \.self) { label in
+                        if RefBadgePopover.names(of: label).isEmpty {
+                            RefBadge(label: label, lane: lane).fixedSize()
+                        } else {
+                            RefBadgeButton(label: label, lane: lane, menus: menus)
+                        }
+                    }
                 }
             }
         }

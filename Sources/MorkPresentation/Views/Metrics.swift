@@ -282,6 +282,11 @@ enum Metrics {
         static let chevronWidth: CGFloat = 2.5
     }
 
+    enum RefPopover {
+        static let width: CGFloat = 300
+        static let maxHeight: CGFloat = 360
+    }
+
     enum Badge {
         static let iconFont: CGFloat = 8.5
         static let iconCellWidth: CGFloat = 16
