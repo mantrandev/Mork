@@ -62,7 +62,6 @@ struct RefBadgeButton: View {
 
     var body: some View {
         RefBadge(label: label, lane: lane)
-            .fixedSize()
             .contentShape(Rectangle())
             .onHover { inside in
                 state.hoverBadge(inside)
