@@ -20,6 +20,12 @@ struct HistoryView: View {
     @State private var multiPrompt: MultiCommitPrompt?
     @State private var marks = HistorySelectionMarks()
     @State private var table = HistoryTableLink()
+    @State private var refMenus: HistoryRefMenus
+
+    init(viewModel: RepositoryViewModel) {
+        _viewModel = Bindable(viewModel)
+        _refMenus = State(initialValue: HistoryRefMenus(viewModel: viewModel))
+    }
 
     var body: some View {
         Group {
@@ -32,7 +38,7 @@ struct HistoryView: View {
                     let graphWidth = CGFloat(min(viewModel.visibleGraphLanes, Self.maxGraphLanes)) * CommitGraphGeometry.laneSpacing
                     ScrollViewReader { proxy in
                         List(selection: Binding(get: { viewModel.selectedCommit?.hash }, set: { viewModel.selectFromHistoryList($0, extending: NSEvent.modifierFlags.contains(.shift)) })) {
-                            HistoryRows(rows: viewModel.visibleHistoryRows, columns: columns, graphWidth: graphWidth, marks: marks, table: table, viewModel: viewModel)
+                            HistoryRows(rows: viewModel.visibleHistoryRows, columns: columns, graphWidth: graphWidth, marks: marks, table: table, viewModel: viewModel, menus: refMenus)
                             if viewModel.isLoadingMoreHistory {
                                 ProgressView()
                                     .controlSize(.small)
@@ -71,6 +77,12 @@ struct HistoryView: View {
                 Task { await viewModel.createBranch(named: name, at: commit, checkout: checkout) }
             }
         }
+        .workspacePrompts(
+            viewModel: viewModel,
+            sheet: Binding(get: { refMenus.sheet }, set: { refMenus.sheet = $0 }),
+            confirmation: Binding(get: { refMenus.confirmation }, set: { refMenus.confirmation = $0 }),
+            onOpenRepository: { _ in }
+        )
         .sheet(item: $tagTarget) { commit in
             CreateTagSheet(viewModel: viewModel, target: .commit(commit), identifier: "tagHereSheet")
         }
@@ -322,15 +334,16 @@ private struct HistoryRows: View, Equatable {
     let marks: HistorySelectionMarks
     let table: HistoryTableLink
     let viewModel: RepositoryViewModel
+    let menus: HistoryRefMenus
 
     nonisolated static func == (lhs: Self, rhs: Self) -> Bool {
-        lhs.rows == rhs.rows && lhs.columns == rhs.columns && lhs.graphWidth == rhs.graphWidth && lhs.marks === rhs.marks && lhs.table === rhs.table && lhs.viewModel === rhs.viewModel
+        lhs.rows == rhs.rows && lhs.columns == rhs.columns && lhs.graphWidth == rhs.graphWidth && lhs.marks === rhs.marks && lhs.table === rhs.table && lhs.viewModel === rhs.viewModel && lhs.menus === rhs.menus
     }
 
     var body: some View {
         let firstID = rows.first?.id
         ForEach(rows, id: \.id) { row in
-            HistoryRow(row: row, columns: columns, graphWidth: graphWidth, isFirst: row.id == firstID, mark: marks.mark(for: row.commit.hash), table: table, viewModel: viewModel)
+            HistoryRow(row: row, columns: columns, graphWidth: graphWidth, isFirst: row.id == firstID, mark: marks.mark(for: row.commit.hash), table: table, viewModel: viewModel, menus: menus)
         }
     }
 }
@@ -384,10 +397,11 @@ private struct HistoryRow: View {
     let mark: HistorySelectionMarks.Mark
     let table: HistoryTableLink
     let viewModel: RepositoryViewModel
+    let menus: HistoryRefMenus
 
     var body: some View {
         let isSelected = mark.isSelected
-        CommitRow(model: row, columns: columns, graphWidth: graphWidth, isSelected: isSelected, signatures: viewModel.signatureBadges)
+        CommitRow(model: row, columns: columns, graphWidth: graphWidth, isSelected: isSelected, signatures: viewModel.signatureBadges, menus: menus)
             .frame(height: HistoryView.rowHeight)
             .background { if isSelected || isFirst { HistoryTableHook(link: table) } }
             .listRowBackground(HistoryRowBackground.color(isSelected: isSelected))
@@ -411,9 +425,10 @@ private struct CommitRow: View, Equatable {
     let graphWidth: CGFloat
     let isSelected: Bool
     let signatures: SignatureBadgeStore
+    let menus: HistoryRefMenus
 
     nonisolated static func == (lhs: Self, rhs: Self) -> Bool {
-        lhs.model == rhs.model && lhs.columns == rhs.columns && lhs.graphWidth == rhs.graphWidth && lhs.isSelected == rhs.isSelected && lhs.signatures === rhs.signatures
+        lhs.model == rhs.model && lhs.columns == rhs.columns && lhs.graphWidth == rhs.graphWidth && lhs.isSelected == rhs.isSelected && lhs.signatures === rhs.signatures && lhs.menus === rhs.menus
     }
 
     private var row: GraphRow { model.graph }
@@ -458,7 +473,7 @@ private struct CommitRow: View, Equatable {
                     message
                 } else {
                     HistoryMessageLayout(spacing: Metrics.Spacing.xs) {
-                        RefBadgeStrip(labels: labels, lane: row.column)
+                        RefBadgeStrip(labels: labels, lane: row.column, menus: menus)
                         message
                             .padding(.leading, 1)
                     }
