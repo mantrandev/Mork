@@ -126,8 +126,8 @@ struct DetailView: View {
     private var headerBarKind: Bool? {
         switch viewModel.selection {
         case .file: true
-        case .commitFile: false
-        case .commit, nil: nil
+        case .commitFile, .commit: false
+        case nil: nil
         }
     }
 
