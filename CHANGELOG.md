@@ -1,5 +1,11 @@
 # Changelog
 
+## v0.0.5 (2026-11-11)
+
+### History
+
+- A commit with several tags shows one badge with the count, such as "14 tags", instead of one tag name followed by +N. A commit with one tag still shows its name.
+
 ## v0.0.4 (2026-11-11)
 
 ### History
