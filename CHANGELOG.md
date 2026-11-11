@@ -1,5 +1,12 @@
 # Changelog
 
+## v0.0.4 (2026-11-11)
+
+### History
+
+- Hover a tag badge with +N, or a +N badge, to see every name in a popover. Click the badge to keep the popover open. The tooltip from v0.0.3 did not appear.
+- Right-click a tag in the popover for the same actions as in the sidebar: checkout, push, merge, rebase, delete and more.
+
 ## v0.0.3 (2026-11-11)
 
 ### History
