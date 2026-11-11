@@ -5,6 +5,8 @@
 ### Sidebar
 
 - Selecting a tag or branch whose commit is far down the history now loads History until the commit is listed, then selects it and scrolls to it. Before, older tags selected the commit without showing its row.
+- Tags sort by Recently used by default, newest first. A sort already chosen for a repository stays.
+- The Recently used sort for tags and remote branches no longer says "(deprecated)".
 
 ## v0.0.6 (2026-11-11)
 
