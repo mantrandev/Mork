@@ -6,21 +6,26 @@ struct RefBadge: View {
 
     private var isCurrent: Bool { label.kind == .currentBranch }
     private var isDetached: Bool { label.kind == .detachedHead }
+    private var hasRemote: Bool { (label.kind == .localBranch || label.kind == .currentBranch) && !label.others.isEmpty }
     private var shape: RoundedRectangle { RoundedRectangle(cornerRadius: Metrics.Radius.badge, style: .continuous) }
 
     var body: some View {
         let ink = Self.ink(for: label.kind, lane: lane).color
         HStack(spacing: 0) {
             if let glyph = Self.glyph(for: label.kind) {
-                Image(systemName: glyph)
-                    .font(.system(size: Metrics.Badge.iconFont, weight: isCurrent ? .heavy : .bold))
-                    .frame(width: Metrics.Badge.iconCellWidth)
+                HStack(spacing: Metrics.Spacing.xxs) {
+                    Image(systemName: glyph)
+                    if hasRemote { Image(systemName: Self.glyph(for: .remoteBranch) ?? "") }
+                }
+                .font(.system(size: Metrics.Badge.iconFont, weight: isCurrent ? .heavy : .bold))
+                .frame(width: hasRemote ? Metrics.Badge.mergedIconCellWidth : Metrics.Badge.iconCellWidth)
                 Rectangle()
                     .fill(ink)
                     .frame(width: Metrics.Badge.borderWidth)
             }
             Text(Self.title(for: label))
                 .font(Metrics.Font.caption.weight(isCurrent || isDetached ? .bold : .medium))
+                .truncationMode(.middle)
                 .padding(.horizontal, Metrics.Badge.padding)
         }
         .lineLimit(1)
@@ -53,8 +58,8 @@ struct RefBadge: View {
 
     private var help: String {
         switch label.kind {
-        case .currentBranch: "Current branch \(label.name)"
-        case .localBranch: "Local branch \(label.name)"
+        case .currentBranch: hasRemote ? "Current branch \(label.name), also at \(label.others.joined(separator: ", "))" : "Current branch \(label.name)"
+        case .localBranch: hasRemote ? "Local branch \(label.name), also at \(label.others.joined(separator: ", "))" : "Local branch \(label.name)"
         case .remoteBranch: "Remote-tracking branch \(label.name)"
         case .tag: label.others.isEmpty ? "Tag \(label.name)" : "Tags \(([label.name] + label.others).joined(separator: ", "))"
         case .detachedHead: "HEAD is detached at this commit"

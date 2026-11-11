@@ -293,6 +293,8 @@ enum Metrics {
         static let borderWidth: CGFloat = 1
         static let padding: CGFloat = 5
         static let height: CGFloat = 18
+        static let minimumWidth: CGFloat = 140
+        static let mergedIconCellWidth: CGFloat = 28
     }
 
     enum EmptyState {
