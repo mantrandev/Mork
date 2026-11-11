@@ -1,5 +1,19 @@
 # Changelog
 
+## v0.0.3 (2026-11-11)
+
+### History
+
+- A commit with many tags shows them as one badge: the newest version, then +N. The tooltip lists every tag.
+- Branch badges come before tags, and badges never push the commit subject out of the row.
+- The file header bar no longer collapses and grows back when you select another branch or commit.
+
+### Memory
+
+- Preloaded commit diffs are capped at 4 MB of text, so browsing History with Show Entire File on no longer grows memory by hundreds of MB.
+- Background tabs drop their caches, and every tab drops them when macOS runs low on memory.
+- The interactive rebase sheet keeps diffs of the selected commit only.
+
 ## v0.0.2 (2026-11-10)
 
 ### Interactive rebase
