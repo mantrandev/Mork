@@ -9,6 +9,7 @@ struct RefLabel: Hashable, Sendable {
         case tag
         case detachedHead
         case stash
+        case more
     }
 
     private static let headPrefix = "HEAD -> "
@@ -16,9 +17,17 @@ struct RefLabel: Hashable, Sendable {
 
     let kind: Kind
     let name: String
+    var others: [String] = []
 
     static func labels(for refNames: [String], remotes: Set<String>) -> [RefLabel] {
         refNames.map { label(for: $0, remotes: remotes) }
+    }
+
+    static func historyBadges(_ labels: [RefLabel]) -> [RefLabel] {
+        let tags = labels.filter { $0.kind == .tag }.map(\.name).sorted { $0.localizedStandardCompare($1) == .orderedDescending }
+        let branches = labels.filter { $0.kind != .tag }
+        guard let newest = tags.first else { return branches }
+        return branches + [RefLabel(kind: .tag, name: newest, others: Array(tags.dropFirst()))]
     }
 
     private static func label(for ref: String, remotes: Set<String>) -> RefLabel {

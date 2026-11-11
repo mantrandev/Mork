@@ -423,6 +423,17 @@ private struct CommitRow: View, Equatable {
     private var isHead: Bool { model.isHead }
     private var secondary: Color { isSelected ? Palette.Text.primary.color : Palette.Text.secondary.color }
 
+    private var message: some View {
+        HStack(spacing: Metrics.Spacing.xs) {
+            SignatureBadge(hash: commit.hash, store: signatures)
+            Text(commit.subject)
+                .fontWeight(isHead ? .semibold : .regular)
+                .foregroundStyle(commit.syncStatus == .remoteOnly ? secondary : Palette.Text.primary.color)
+                .lineLimit(1)
+                .truncationMode(.tail)
+        }
+    }
+
     var body: some View {
         HStack(spacing: HistoryColumns.spacing) {
             HStack(spacing: Metrics.Spacing.xs) {
@@ -443,17 +454,15 @@ private struct CommitRow: View, Equatable {
                     BisectBadge(kind: bisect)
                         .fixedSize()
                 }
-                ForEach(labels, id: \.self) { label in
-                    RefBadge(label: label, lane: row.column)
-                        .fixedSize()
+                if labels.isEmpty {
+                    message
+                } else {
+                    HistoryMessageLayout(spacing: Metrics.Spacing.xs) {
+                        RefBadgeStrip(labels: labels, lane: row.column)
+                        message
+                            .padding(.leading, 1)
+                    }
                 }
-                SignatureBadge(hash: commit.hash, store: signatures)
-                Text(commit.subject)
-                    .fontWeight(isHead ? .semibold : .regular)
-                    .foregroundStyle(commit.syncStatus == .remoteOnly ? secondary : Palette.Text.primary.color)
-                    .lineLimit(1)
-                    .truncationMode(.tail)
-                    .padding(.leading, labels.isEmpty ? 0 : 1)
             }
             .frame(maxWidth: .infinity, alignment: .leading)
             .layoutPriority(1)
