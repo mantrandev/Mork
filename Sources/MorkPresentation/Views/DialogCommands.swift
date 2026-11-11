@@ -189,6 +189,12 @@ struct ErrorReport: Equatable {
         summary = "\(name.map { "git \($0)" } ?? "The command") stopped with exit code \(exitCode). Git's output below says why; fix that, then run it again."
     }
 
+    static func hiddenFilesNote(_ paths: [String]) -> String {
+        let names = paths.joined(separator: ", ")
+        let subject = paths.count == 1 ? "\(names) is" : "\(names) are"
+        return "\(subject) marked skip-worktree or assume-unchanged, so Git hides the local changes and the Changes list looks clean. Unhide to see the changes, then commit, stash or discard them and run the command again."
+    }
+
     private static func exitCode(_ line: String) -> Int32? {
         guard line.hasPrefix("exit ") else { return nil }
         return Int32(line.dropFirst("exit ".count))

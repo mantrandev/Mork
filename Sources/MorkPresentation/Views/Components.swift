@@ -14,20 +14,24 @@ enum FolderPicker {
 }
 
 extension View {
-    func errorAlert(_ message: Binding<String?>) -> some View {
+    func errorAlert(_ message: Binding<String?>, hiddenFiles: [String] = [], unhide: (([String]) -> Void)? = nil) -> some View {
         sheet(isPresented: Binding(get: { message.wrappedValue != nil }, set: { if !$0 { message.wrappedValue = nil } })) {
-            ErrorSheet(message: message.wrappedValue ?? "")
+            ErrorSheet(message: message.wrappedValue ?? "", hiddenFiles: hiddenFiles, unhide: unhide)
         }
     }
 }
 
 struct ErrorSheet: View {
     let message: String
+    let hiddenFiles: [String]
+    let unhide: (([String]) -> Void)?
     private let report: ErrorReport
     @Environment(\.dismiss) private var dismiss
 
-    init(message: String) {
+    init(message: String, hiddenFiles: [String] = [], unhide: (([String]) -> Void)? = nil) {
         self.message = message
+        self.hiddenFiles = hiddenFiles
+        self.unhide = unhide
         report = ErrorReport(message: message)
     }
 
@@ -59,8 +63,21 @@ struct ErrorSheet: View {
                 .accessibilityElement(children: .contain)
                 .accessibilityIdentifier("error.message")
             }
-            DialogButtonRow {
-                DialogConfirmButton(title: "OK", identifier: "error.ok") { dismiss() }
+            if let unhide, !hiddenFiles.isEmpty {
+                DialogNote(text: ErrorReport.hiddenFilesNote(hiddenFiles), tone: .warning)
+                    .accessibilityIdentifier("error.hiddenFiles")
+                DialogButtonRow {
+                    DialogCancelButton(title: "OK", identifier: "error.ok") { dismiss() }
+                    DialogConfirmButton(title: "Unhide Files", identifier: "error.unhide") {
+                        let paths = hiddenFiles
+                        dismiss()
+                        unhide(paths)
+                    }
+                }
+            } else {
+                DialogButtonRow {
+                    DialogConfirmButton(title: "OK", identifier: "error.ok") { dismiss() }
+                }
             }
         }
         .padding(Metrics.Sheet.padding)

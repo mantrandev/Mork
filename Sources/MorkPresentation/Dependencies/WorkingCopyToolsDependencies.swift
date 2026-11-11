@@ -15,6 +15,8 @@ public struct WorkingCopyToolsDependencies: Sendable {
     public let createPatch: CreatePatchUseCaseProtocol
     public let loadIgnoredFiles: LoadIgnoredFilesUseCaseProtocol
     public let stageIgnoredFiles: StageIgnoredFilesUseCaseProtocol
+    public let findHiddenFiles: FindHiddenFilesUseCaseProtocol
+    public let unhideFiles: UnhideFilesUseCaseProtocol
     public let panels: FilePanelsProtocol
 
     public init(
@@ -26,6 +28,8 @@ public struct WorkingCopyToolsDependencies: Sendable {
         createPatch: CreatePatchUseCaseProtocol,
         loadIgnoredFiles: LoadIgnoredFilesUseCaseProtocol,
         stageIgnoredFiles: StageIgnoredFilesUseCaseProtocol,
+        findHiddenFiles: FindHiddenFilesUseCaseProtocol,
+        unhideFiles: UnhideFilesUseCaseProtocol,
         panels: FilePanelsProtocol
     ) {
         self.applyLines = applyLines
@@ -36,6 +40,8 @@ public struct WorkingCopyToolsDependencies: Sendable {
         self.createPatch = createPatch
         self.loadIgnoredFiles = loadIgnoredFiles
         self.stageIgnoredFiles = stageIgnoredFiles
+        self.findHiddenFiles = findHiddenFiles
+        self.unhideFiles = unhideFiles
         self.panels = panels
     }
 }

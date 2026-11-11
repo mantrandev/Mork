@@ -175,7 +175,10 @@ public final class RepositoryViewModel {
         didSet { if branchFilter != oldValue { scheduleFilters() } }
     }
     public var sheet: Sheet?
-    public var errorMessage: String?
+    public var errorMessage: String? {
+        didSet { if errorMessage != oldValue { hiddenFilesInError = [] } }
+    }
+    public private(set) var hiddenFilesInError: [String] = []
     public internal(set) var selectedCommitHashes: Set<String> = []
     var multiSelectionRows: [HistoryRowModel] = []
     public internal(set) var multiCommitDiffTarget: MultiCommitDiffTarget = .checking
@@ -749,6 +752,10 @@ public final class RepositoryViewModel {
         await perform { try await $0.applyHunk.execute(action: action, hunk: hunk, patch: patch, change: change) }
     }
 
+    public func unhide(_ paths: [String]) async {
+        await perform { try await $0.tools.unhideFiles.execute(paths: paths) }
+    }
+
     public func waitForDetail() async {
         await detailTask?.value
         await commitInfoTask?.value
@@ -774,7 +781,12 @@ public final class RepositoryViewModel {
         }
         guard let failure else { return true }
         let stoppedOnConflicts = stateBefore == .clean && repositoryState != .clean && !conflictedChanges.isEmpty
-        if !stoppedOnConflicts { errorMessage = failure.localizedDescription }
+        if !stoppedOnConflicts {
+            let message = failure.localizedDescription
+            let hidden = (try? await dependencies.tools.findHiddenFiles.execute(failureMessage: message)) ?? []
+            errorMessage = message
+            hiddenFilesInError = hidden
+        }
         return false
     }
 
