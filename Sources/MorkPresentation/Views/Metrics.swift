@@ -252,6 +252,7 @@ enum Metrics {
         static let listMaximumHeight: CGFloat = 900
         static let detailsFrameMinimumHeight: CGFloat = 160
         static let browserMinimumHeight: CGFloat = 300
+        static let badgeShare: CGFloat = 0.4
     }
 
     enum Shadow {

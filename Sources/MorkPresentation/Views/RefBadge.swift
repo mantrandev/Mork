@@ -19,7 +19,7 @@ struct RefBadge: View {
                     .fill(ink)
                     .frame(width: Metrics.Badge.borderWidth)
             }
-            Text(label.name)
+            Text(title)
                 .font(Metrics.Font.caption.weight(isCurrent || isDetached ? .bold : .medium))
                 .padding(.horizontal, Metrics.Badge.padding)
         }
@@ -43,7 +43,12 @@ struct RefBadge: View {
         case .tag: "tag"
         case .detachedHead: nil
         case .stash: "archivebox"
+        case .more: nil
         }
+    }
+
+    private var title: String {
+        label.others.isEmpty ? label.name : "\(label.name) +\(label.others.count)"
     }
 
     private var help: String {
@@ -51,9 +56,10 @@ struct RefBadge: View {
         case .currentBranch: "Current branch \(label.name)"
         case .localBranch: "Local branch \(label.name)"
         case .remoteBranch: "Remote-tracking branch \(label.name)"
-        case .tag: "Tag \(label.name)"
+        case .tag: label.others.isEmpty ? "Tag \(label.name)" : "Tags \(([label.name] + label.others).joined(separator: ", "))"
         case .detachedHead: "HEAD is detached at this commit"
         case .stash: "Stash \(label.name): changes put aside with git stash, based on the commit below it"
+        case .more: "Also on this commit: \(label.others.joined(separator: ", "))"
         }
     }
 }

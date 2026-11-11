@@ -61,7 +61,7 @@ struct HistoryRowModel: Identifiable, Equatable, Sendable {
         let calendar = Calendar.current
         let locale = Locale.current
         return rows.map { row in
-            let labels = RefLabel.labels(for: context.options.visibleRefs(of: row.commit), remotes: context.remotes)
+            let labels = RefLabel.historyBadges(RefLabel.labels(for: context.options.visibleRefs(of: row.commit), remotes: context.remotes))
             return HistoryRowModel(
                 graph: row,
                 labels: labels,
