@@ -246,6 +246,7 @@ public final class RepositoryViewModel {
     public private(set) var isAmending = false
     public internal(set) var commitTemplate: CommitTemplate?
     @ObservationIgnored var prefilledMessage: CommitMessage?
+    @ObservationIgnored var amendMessage: (filled: CommitMessage, previous: CommitMessage)?
     @ObservationIgnored var commitTemplateTask: Task<Void, Never>?
     public var searchText = "" {
         didSet { if searchText != oldValue { scheduleSearch() } }
@@ -416,9 +417,15 @@ public final class RepositoryViewModel {
         isLoadingMoreHistory = false
         do {
             let limit = max(Self.historyLimit, presentation.snapshot.historyCursor.loadedCommits.roundedUp(to: Self.historyLimit))
+            let amending = isAmending
             async let ignored = Self.ignoredFiles(showing: changeListOptions.showsIgnored, dependencies: dependencies)
+            async let amended = amending ? dependencies.commit.loadWorkingCopyChanges.execute(amending: true) : nil
             var loaded = try await dependencies.loadSnapshot.execute(historyLimit: limit, options: historyOptions)
-            if isAmending { loaded = loaded.replacingChanges(try await dependencies.commit.loadAmendChanges.execute()) }
+            if let amended = try await amended { loaded = loaded.replacingChanges(amended) }
+            if amending != isAmending {
+                loaded = loaded.replacingChanges(presentation.snapshot.changes)
+                refreshRequested = true
+            }
             ignoredChanges = await ignored
             if hasLoaded, let branch = loaded.branches.first(where: \.isCurrent), branch.fullName != currentBranch?.fullName {
                 rememberBranch(branch, among: loaded.branches)
@@ -618,27 +625,71 @@ public final class RepositoryViewModel {
     }
 
     public func setAmending(_ amending: Bool) async {
+        guard amending != isAmending else { return }
         isAmending = amending
-        await refresh()
-        guard amending, isComposerUntouched else { return }
-        do {
-            let last = CommitMessage(parsing: try await dependencies.loadLastCommitMessage.execute() ?? "")
-            commitSubject = last.subject
-            commitDescription = last.description
-        } catch {
+        if !amending { restoreMessageBeforeAmend() }
+        let dependencies = dependencies
+        let fillsMessage = amending && isComposerUntouched
+        async let changes = Self.workingCopyChanges(amending: amending, dependencies: dependencies)
+        async let lastMessage = fillsMessage ? Self.lastCommitMessage(dependencies) : nil
+        let (loadedChanges, loadedMessage) = await (changes, lastMessage)
+        guard isAmending == amending else { return }
+        switch loadedMessage {
+        case let .success(text):
+            if isComposerUntouched { fillAmendMessage(CommitMessage(parsing: text ?? "")) }
+        case let .failure(error):
             errorMessage = error.localizedDescription
+        case nil:
+            break
+        }
+        guard let loadedChanges else {
+            await refresh()
+            return
+        }
+        workingDiffs.clear()
+        await present(presentation.snapshot.replacingChanges(loadedChanges))
+        stagingTick &+= 1
+        reconcileSelection()
+    }
+
+    private func fillAmendMessage(_ last: CommitMessage) {
+        amendMessage = (filled: last, previous: commitMessage)
+        commitSubject = last.subject
+        commitDescription = last.description
+    }
+
+    private func restoreMessageBeforeAmend() {
+        guard let amendMessage else { return }
+        self.amendMessage = nil
+        guard commitMessage == amendMessage.filled else { return }
+        commitSubject = amendMessage.previous.subject
+        commitDescription = amendMessage.previous.description
+    }
+
+    nonisolated static func workingCopyChanges(amending: Bool, dependencies: RepositoryDependencies) async -> [FileChange]? {
+        try? await dependencies.commit.loadWorkingCopyChanges.execute(amending: amending)
+    }
+
+    nonisolated static func lastCommitMessage(_ dependencies: RepositoryDependencies) async -> Result<String?, Error> {
+        do {
+            return .success(try await dependencies.loadLastCommitMessage.execute())
+        } catch {
+            return .failure(error)
         }
     }
 
     public func commit() async {
         let message = commitMessage.text
         let amend = isAmending
-        if await perform({ try await $0.commitChanges.execute(message: message, amend: amend) }) {
+        let committed = await perform { dependencies in
+            try await dependencies.commitChanges.execute(message: message, amend: amend)
+            isAmending = false
+        }
+        if committed {
             commitSubject = ""
             commitDescription = ""
-            isAmending = false
+            amendMessage = nil
             prefillCommitTemplate()
-            if amend { await refresh() }
         }
     }
 
