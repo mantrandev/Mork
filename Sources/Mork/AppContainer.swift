@@ -282,6 +282,8 @@ enum AppContainer {
                 createPatch: CreatePatchUseCase(patches: patches),
                 loadIgnoredFiles: LoadIgnoredFilesUseCase(workingCopy: workingCopy),
                 stageIgnoredFiles: StageIgnoredFilesUseCase(workingCopy: workingCopy),
+                findHiddenFiles: FindHiddenFilesUseCase(workingCopy: workingCopy),
+                unhideFiles: UnhideFilesUseCase(workingCopy: workingCopy),
                 panels: panels
             ),
             workspace: WorkspaceDependencies(

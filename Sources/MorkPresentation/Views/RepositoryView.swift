@@ -121,7 +121,9 @@ struct RepositoryView: View {
             }
         }
         .workingCopyToolsPresentation(viewModel)
-        .errorAlert($viewModel.errorMessage)
+        .errorAlert($viewModel.errorMessage, hiddenFiles: viewModel.hiddenFilesInError) { paths in
+            Task { await viewModel.unhide(paths) }
+        }
         .repositorySettingsPresentation(viewModel)
         .advancedToolsPresentation(viewModel)
         .customCommandConfirmation(viewModel)

@@ -20,6 +20,20 @@ public final class WorkingCopyRepositoryImpl: WorkingCopyRepositoryProtocol {
         GitOutputParser.status(try await executor.read(["status", "--porcelain=v1", "-z", "--ignored", "--untracked-files=normal"])).filter(\.isIgnored)
     }
 
+    public func hiddenFiles(among paths: [String]) async throws -> [String] {
+        guard !paths.isEmpty else { return [] }
+        let output = try await executor.read([Self.literalPathspecs, "ls-files", "-v", "-z", "--"] + paths)
+        return output.split(separator: "\0").compactMap { entry in
+            guard let tag = entry.first, entry.dropFirst().first == " ", tag == "S" || tag.isLowercase else { return nil }
+            return String(entry.dropFirst(2))
+        }
+    }
+
+    public func unhide(paths: [String]) async throws {
+        try await executor.write(["update-index", "--no-skip-worktree", "--"] + paths)
+        try await executor.write(["update-index", "--no-assume-unchanged", "--"] + paths)
+    }
+
     public func diff(for change: FileChange, staged: Bool) async throws -> String {
         let options = diffOptions.diffOptions().workingCopyArguments
         if staged {
