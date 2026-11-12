@@ -345,7 +345,10 @@ enum AppContainer {
                 loadCommitTemplate: LoadCommitTemplateUseCase(templates: templates),
                 loadCommitSignatures: LoadCommitSignaturesUseCase(signatures: signatures),
                 loadCommitMessages: LoadCommitMessagesUseCase(messages: history),
-                runCustomCommand: RunCustomCommandUseCase(git: commands, shell: ShellCommandRepositoryImpl(root: repository, logger: logger))
+                runCustomCommand: RunCustomCommandUseCase(git: commands, shell: ShellCommandRepositoryImpl(root: repository, logger: logger)),
+                loadAmendChanges: LoadAmendChangesUseCase(workingCopy: workingCopy),
+                loadAmendDiff: LoadAmendDiffUseCase(workingCopy: workingCopy),
+                unstageFromAmend: UnstageFromAmendUseCase(workingCopy: workingCopy)
             ),
             advanced: makeAdvancedDependencies(executor: executor, repository: repository, diffOptions: diffOptions),
             branchActions: makeBranchActionsDependencies(executor: executor, workingCopy: workingCopy, remote: remote, remoteManagement: remoteManagement),

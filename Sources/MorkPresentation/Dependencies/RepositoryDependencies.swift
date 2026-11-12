@@ -139,3 +139,13 @@ public struct RepositoryDependencies: Sendable {
         self.range = range
     }
 }
+
+extension RepositoryDependencies {
+    func unstage(paths: [String], amending: Bool) async throws {
+        if amending {
+            try await commit.unstageFromAmend.execute(paths: paths)
+        } else {
+            try await unstageFiles.execute(paths: paths)
+        }
+    }
+}

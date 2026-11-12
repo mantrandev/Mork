@@ -417,7 +417,8 @@ public final class RepositoryViewModel {
         do {
             let limit = max(Self.historyLimit, presentation.snapshot.historyCursor.loadedCommits.roundedUp(to: Self.historyLimit))
             async let ignored = Self.ignoredFiles(showing: changeListOptions.showsIgnored, dependencies: dependencies)
-            let loaded = try await dependencies.loadSnapshot.execute(historyLimit: limit, options: historyOptions)
+            var loaded = try await dependencies.loadSnapshot.execute(historyLimit: limit, options: historyOptions)
+            if isAmending { loaded = loaded.replacingChanges(try await dependencies.commit.loadAmendChanges.execute()) }
             ignoredChanges = await ignored
             if hasLoaded, let branch = loaded.branches.first(where: \.isCurrent), branch.fullName != currentBranch?.fullName {
                 rememberBranch(branch, among: loaded.branches)
@@ -599,7 +600,8 @@ public final class RepositoryViewModel {
 
     public func unstageAll() async {
         let paths = stagedChanges.map(\.path)
-        await moveStaging(stagedChanges, toStaged: false) { try await $0.unstageFiles.execute(paths: paths) }
+        let amending = isAmending
+        await moveStaging(stagedChanges, toStaged: false) { try await $0.unstage(paths: paths, amending: amending) }
     }
 
     public func discard(_ change: FileChange) async {
@@ -617,6 +619,7 @@ public final class RepositoryViewModel {
 
     public func setAmending(_ amending: Bool) async {
         isAmending = amending
+        await refresh()
         guard amending, isComposerUntouched else { return }
         do {
             let last = CommitMessage(parsing: try await dependencies.loadLastCommitMessage.execute() ?? "")
@@ -635,6 +638,7 @@ public final class RepositoryViewModel {
             commitDescription = ""
             isAmending = false
             prefillCommitTemplate()
+            if amend { await refresh() }
         }
     }
 
@@ -879,6 +883,7 @@ public final class RepositoryViewModel {
         let tabWidth: Int
         let showsLarge: Bool
         let path: String?
+        let amending: Bool
     }
 
     struct LoadedDetail: Sendable {
@@ -887,7 +892,7 @@ public final class RepositoryViewModel {
     }
 
     func detailRequest(_ selection: Selection) -> DetailRequest {
-        DetailRequest(selection: selection, dependencies: dependencies, tabWidth: settings.diff.tabWidth, showsLarge: showsLargeDiff, path: selectedFilePath)
+        DetailRequest(selection: selection, dependencies: dependencies, tabWidth: settings.diff.tabWidth, showsLarge: showsLargeDiff, path: selectedFilePath, amending: isAmending)
     }
 
     private func loadDetail(_ selection: Selection) {
@@ -909,7 +914,9 @@ public final class RepositoryViewModel {
             var usesPatch = false
             switch selection {
             case let .file(change, staged):
-                text = try await dependencies.loadFileDiff.execute(change: change, staged: staged)
+                text = try await staged && request.amending
+                    ? dependencies.commit.loadAmendDiff.execute(change: change)
+                    : dependencies.loadFileDiff.execute(change: change, staged: staged)
                 isFile = true
                 usesPatch = !HunkAction.available(for: change, staged: staged).isEmpty
             case let .commit(commit):

@@ -6,17 +6,26 @@ public struct CommitDependencies: Sendable {
     public let loadCommitSignatures: LoadCommitSignaturesUseCaseProtocol
     public let loadCommitMessages: LoadCommitMessagesUseCaseProtocol
     public let runCustomCommand: RunCustomCommandUseCaseProtocol
+    public let loadAmendChanges: LoadAmendChangesUseCaseProtocol
+    public let loadAmendDiff: LoadAmendDiffUseCaseProtocol
+    public let unstageFromAmend: UnstageFromAmendUseCaseProtocol
 
     public init(
         loadCommitTemplate: LoadCommitTemplateUseCaseProtocol,
         loadCommitSignatures: LoadCommitSignaturesUseCaseProtocol,
         loadCommitMessages: LoadCommitMessagesUseCaseProtocol,
-        runCustomCommand: RunCustomCommandUseCaseProtocol
+        runCustomCommand: RunCustomCommandUseCaseProtocol,
+        loadAmendChanges: LoadAmendChangesUseCaseProtocol,
+        loadAmendDiff: LoadAmendDiffUseCaseProtocol,
+        unstageFromAmend: UnstageFromAmendUseCaseProtocol
     ) {
         self.loadCommitTemplate = loadCommitTemplate
         self.loadCommitSignatures = loadCommitSignatures
         self.loadCommitMessages = loadCommitMessages
         self.runCustomCommand = runCustomCommand
+        self.loadAmendChanges = loadAmendChanges
+        self.loadAmendDiff = loadAmendDiff
+        self.unstageFromAmend = unstageFromAmend
     }
 }
 
