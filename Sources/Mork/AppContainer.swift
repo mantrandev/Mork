@@ -346,7 +346,7 @@ enum AppContainer {
                 loadCommitSignatures: LoadCommitSignaturesUseCase(signatures: signatures),
                 loadCommitMessages: LoadCommitMessagesUseCase(messages: history),
                 runCustomCommand: RunCustomCommandUseCase(git: commands, shell: ShellCommandRepositoryImpl(root: repository, logger: logger)),
-                loadAmendChanges: LoadAmendChangesUseCase(workingCopy: workingCopy),
+                loadWorkingCopyChanges: LoadWorkingCopyChangesUseCase(workingCopy: workingCopy),
                 loadAmendDiff: LoadAmendDiffUseCase(workingCopy: workingCopy),
                 unstageFromAmend: UnstageFromAmendUseCase(workingCopy: workingCopy)
             ),
