@@ -209,20 +209,14 @@ struct CommitComposer: View {
                     .foregroundStyle(Palette.Text.primary.color)
                     .focused($focus, equals: .subject)
                     .accessibilityIdentifier("commit.message")
-                Text("\(viewModel.commitSubject.count)/\(CommitMessage.recommendedSubjectLength)")
+                Text("\(viewModel.commitSubject.count)")
                     .font(Metrics.Font.monoCaption)
-                    .foregroundStyle(viewModel.isSubjectTooLong ? Palette.Status.conflict.ink.color : Palette.Text.tertiary.color)
+                    .foregroundStyle(Palette.Text.tertiary.color)
                     .accessibilityIdentifier("commit.subjectCount")
             }
             .padding(.horizontal, Metrics.Spacing.s)
             .frame(height: Metrics.Control.regular)
             .fieldChrome(isFocused: focus == .subject)
-            if viewModel.isSubjectTooLong {
-                Label("Subject is longer than \(CommitMessage.recommendedSubjectLength) characters.", systemImage: "exclamationmark.triangle")
-                    .font(Metrics.Font.caption)
-                    .foregroundStyle(Palette.Status.conflict.ink.color)
-                    .accessibilityIdentifier("commit.subjectWarning")
-            }
             TextEditor(text: $viewModel.commitDescription)
                 .font(Metrics.Font.title)
                 .foregroundStyle(Palette.Text.primary.color)

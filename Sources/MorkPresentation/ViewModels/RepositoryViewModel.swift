@@ -344,7 +344,6 @@ public final class RepositoryViewModel {
 
     public var name: String { url.lastPathComponent }
     public var commitMessage: CommitMessage { CommitMessage(subject: commitSubject, description: commitDescription) }
-    public var isSubjectTooLong: Bool { commitMessage.isSubjectTooLong }
     public var canCommit: Bool {
         !effectiveCommitMessage.isEmpty && (isAmending || !stagedChanges.isEmpty)
     }

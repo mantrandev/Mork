@@ -1,8 +1,6 @@
 import Foundation
 
 public struct CommitMessage: Equatable, Sendable {
-    public static let recommendedSubjectLength = 72
-
     public let subject: String
     public let description: String
 
@@ -27,5 +25,4 @@ public struct CommitMessage: Equatable, Sendable {
     }
 
     public var isEmpty: Bool { text.isEmpty }
-    public var isSubjectTooLong: Bool { subject.count > Self.recommendedSubjectLength }
 }
