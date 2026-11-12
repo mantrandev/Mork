@@ -34,6 +34,47 @@ public final class WorkingCopyRepositoryImpl: WorkingCopyRepositoryProtocol {
         try await executor.write(["update-index", "--no-assume-unchanged", "--"] + paths)
     }
 
+    public func amendChanges() async throws -> [FileChange] {
+        let status = try await changes()
+        guard let base = try await amendBase() else { return status }
+        let committed = GitOutputParser.nameStatus(try await executor.read(["diff", "--cached", "--name-status", "-z", "-M", base]))
+        let byPath = Dictionary(committed.map { ($0.path, $0) }, uniquingKeysWith: { first, _ in first })
+        var seen = Set<String>()
+        var result: [FileChange] = []
+        for change in status {
+            seen.insert(change.path)
+            if change.isConflicted || change.isUntracked || change.isIgnored {
+                result.append(change)
+                continue
+            }
+            let entry = byPath[change.path]
+            let merged = FileChange(path: change.path, originalPath: entry?.originalPath, index: entry?.status ?? " ", worktree: change.worktree)
+            if merged.isStaged || merged.hasWorktreeChanges { result.append(merged) }
+        }
+        for entry in committed where !seen.contains(entry.path) {
+            result.append(FileChange(path: entry.path, originalPath: entry.originalPath, index: entry.status, worktree: " "))
+        }
+        return result
+    }
+
+    public func amendDiff(for change: FileChange) async throws -> String {
+        guard let base = try await amendBase() else { return try await diff(for: change, staged: true) }
+        let options = diffOptions.diffOptions().workingCopyArguments
+        return try await executor.readLossless([Self.literalPathspecs, "diff"] + options + ["--cached", base, "--", change.path])
+    }
+
+    public func unstageFromAmend(paths: [String]) async throws {
+        guard let base = try await amendBase() else { return try await unstage(paths: paths) }
+        try await executor.write([Self.literalPathspecs, "reset", "-q", base, "--"] + paths)
+    }
+
+    private func amendBase() async throws -> String? {
+        let parent = try await executor.read(["rev-parse", "--verify", "--quiet", "HEAD^"], allowedExitCodes: [0, 1]).trimmingCharacters(in: .newlines)
+        if !parent.isEmpty { return parent }
+        guard try await executor.hasHead() else { return nil }
+        return try await executor.read(["hash-object", "-t", "tree", "/dev/null"]).trimmingCharacters(in: .newlines)
+    }
+
     public func diff(for change: FileChange, staged: Bool) async throws -> String {
         let options = diffOptions.diffOptions().workingCopyArguments
         if staged {

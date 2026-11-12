@@ -49,6 +49,10 @@ public struct RepositorySnapshot: Sendable, Equatable {
 
     public static let empty = RepositorySnapshot()
 
+    public func replacingChanges(_ changes: [FileChange]) -> RepositorySnapshot {
+        RepositorySnapshot(branches: branches, changes: changes, history: history, stashes: stashes, tags: tags, state: state, remotes: remotes, worktrees: worktrees, submodules: submodules, bisect: bisect, historyCursor: historyCursor)
+    }
+
     public var commits: [Commit] { history.map(\.commit) }
     public var currentBranch: Branch? { branches.first(where: \.isCurrent) }
     public var localBranches: [Branch] { branches.filter { !$0.isRemote } }

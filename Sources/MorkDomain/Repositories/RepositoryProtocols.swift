@@ -10,6 +10,9 @@ public protocol WorkingCopyRepositoryProtocol: Sendable {
     func ignoredFiles() async throws -> [FileChange]
     func hiddenFiles(among paths: [String]) async throws -> [String]
     func unhide(paths: [String]) async throws
+    func amendChanges() async throws -> [FileChange]
+    func amendDiff(for change: FileChange) async throws -> String
+    func unstageFromAmend(paths: [String]) async throws
     func diff(for change: FileChange, staged: Bool) async throws -> String
     func stage(paths: [String]) async throws
     func forceStage(paths: [String]) async throws

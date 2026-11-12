@@ -25,12 +25,13 @@ extension RepositoryViewModel {
         guard !movable.isEmpty else { return }
         let paths = movable.filter { !$0.isIgnored }.map(\.path).sorted()
         let ignored = movable.filter(\.isIgnored).map(\.path).sorted()
+        let amending = isAmending
         await moveStaging(changes, toStaged: toStaged, keepingPosition: keepingPosition) { dependencies in
             if toStaged {
                 if !paths.isEmpty { try await dependencies.stageFiles.execute(paths: paths) }
                 if !ignored.isEmpty { try await dependencies.tools.stageIgnoredFiles.execute(paths: ignored) }
             } else {
-                try await dependencies.unstageFiles.execute(paths: paths)
+                try await dependencies.unstage(paths: paths, amending: amending)
             }
         }
     }

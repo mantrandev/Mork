@@ -29,7 +29,7 @@ extension RepositoryViewModel {
 
     func workingDiffTask(for key: WorkingCopyDiffCache.Key) -> Task<LoadedDetail, Never> {
         let selection = Selection.file(key.change, staged: key.staged)
-        let request = DetailRequest(selection: selection, dependencies: dependencies, tabWidth: settings.diff.tabWidth, showsLarge: false, path: key.change.path)
+        let request = DetailRequest(selection: selection, dependencies: dependencies, tabWidth: settings.diff.tabWidth, showsLarge: false, path: key.change.path, amending: isAmending)
         return workingDiffs.load(key) { await Self.fetchDetail(request) }
     }
 }
