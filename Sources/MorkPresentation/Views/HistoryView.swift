@@ -39,20 +39,23 @@ struct HistoryView: View {
                     ScrollViewReader { proxy in
                         List(selection: Binding(get: { viewModel.selectedCommit?.hash }, set: { viewModel.selectFromHistoryList($0, extending: NSEvent.modifierFlags.contains(.shift)) })) {
                             HistoryRows(rows: viewModel.visibleHistoryRows, columns: columns, graphWidth: graphWidth, marks: marks, table: table, viewModel: viewModel, menus: refMenus)
-                            if viewModel.isLoadingMoreHistory {
-                                ProgressView()
-                                    .controlSize(.small)
-                                    .frame(maxWidth: .infinity)
-                                    .accessibilityIdentifier("history.loadingMore")
-                            }
                         }
                         .listStyle(.plain)
                         .environment(\.defaultMinListRowHeight, Self.rowHeight)
                         .accessibilityIdentifier("history.list")
                         .contextMenu(forSelectionType: String.self) { hashes in menu(for: hashes) }
                         .overlay { HistorySearchEmptyState(viewModel: viewModel) }
+                        .overlay(alignment: .bottom) {
+                            if viewModel.isLoadingMoreHistory {
+                                ProgressView()
+                                    .controlSize(.small)
+                                    .padding(Metrics.Spacing.xs)
+                                    .accessibilityIdentifier("history.loadingMore")
+                            }
+                        }
                         .background { HistorySelectionSync(viewModel: viewModel, marks: marks) }
                         .onAppear { table.viewModel = viewModel }
+                        .onContinuousHover { phase in table.hover(phase != .ended) }
                         .onChange(of: isActiveTab, initial: true) { _, active in table.isInActiveTab = active }
                         .onChange(of: viewModel.scrollRequest, initial: true) { _, request in
                             guard let request, request.hash == viewModel.selectedCommit?.hash else { return }
@@ -408,9 +411,6 @@ private struct HistoryRow: View {
             .listRowSeparator(.hidden)
             .listRowInsets(EdgeInsets(top: 0, leading: Metrics.Spacing.xs, bottom: 0, trailing: Metrics.Spacing.s))
             .tag(row.commit.hash)
-            .onHover { inside in
-                if inside { viewModel.hoverCommit(row.commit) } else { viewModel.endHover(row.commit) }
-            }
             .onAppear {
                 viewModel.loadMoreHistoryIfNeeded(after: row.id)
                 viewModel.requestSignature(for: row.commit.hash)
