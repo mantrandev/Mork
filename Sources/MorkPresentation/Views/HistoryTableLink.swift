@@ -1,4 +1,5 @@
 import AppKit
+import MorkDomain
 import SwiftUI
 
 enum HistoryPointerAction: Equatable {
@@ -42,6 +43,7 @@ final class HistoryTableLink {
     var isInActiveTab = true
     private(set) weak var table: NSTableView?
     private var monitor: Any?
+    private var hoveredHash: String?
 
     func attach(_ table: NSTableView) {
         guard self.table !== table else { return }
@@ -51,6 +53,19 @@ final class HistoryTableLink {
             let consumed = MainActor.assumeIsolated { self?.consumes(event) ?? false }
             return consumed ? nil : event
         }
+    }
+
+    func hover(_ active: Bool) {
+        guard let viewModel else { return }
+        var commit: Commit?
+        if active, let table, let window = table.window {
+            let row = table.row(at: table.convert(window.mouseLocationOutsideOfEventStream, from: nil))
+            let rows = viewModel.visibleHistoryRows
+            commit = rows.indices.contains(row) ? rows[row].commit : nil
+        }
+        guard commit?.hash != hoveredHash else { return }
+        hoveredHash = commit?.hash
+        viewModel.hoverCommit(commit)
     }
 
     func detach() {

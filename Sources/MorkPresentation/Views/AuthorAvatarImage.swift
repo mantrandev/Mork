@@ -48,15 +48,16 @@ struct AuthorAvatarImage: View {
 
     var body: some View {
         let image = currentImage
-        AuthorInitials(name: name, fontSize: style.fontSize)
-            .frame(width: style.size, height: style.size)
-            .overlay {
-                if let image {
-                    Image(decorative: image, scale: displayScale)
-                        .resizable()
-                        .interpolation(.high)
-                }
+        Group {
+            if let image {
+                Image(decorative: image, scale: displayScale)
+                    .resizable()
+                    .interpolation(.high)
+            } else {
+                AuthorInitials(name: name, fontSize: style.fontSize)
             }
+        }
+            .frame(width: style.size, height: style.size)
             .clipShape(RoundedRectangle(cornerRadius: style.cornerRadius, style: .continuous))
             .accessibilityHidden(true)
             .task(id: image == nil ? requestKey : nil) { await load() }
