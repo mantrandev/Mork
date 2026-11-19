@@ -120,6 +120,11 @@ DEV and normal builds can run side by side. Each has its own data.
 mork                     # the repository of this folder
 mork ~/code/api          # the repository of that folder
 mork Sources/App.swift   # the repository of that file
+mork -C ~/code/api       # run as if started in that folder
+mork status              # the Changes view (same as mork commit)
+mork log                 # the commit history
+mork log -- README.md    # the history of one file
+mork --version           # the version of Mork
 ```
 
 You can also drop a folder on Mork in the Dock.
