@@ -54,9 +54,9 @@ struct MainWindow: View {
         if let url = options.repositoryURL {
             await primary.open(url)
         }
-        ExternalOpenQueue.shared.attach { [primary] urls in
+        ExternalOpenQueue.shared.attach { [primary] requests in
             Task { @MainActor in
-                for url in urls { await primary.open(url) }
+                for request in requests { await primary.open(request) }
             }
         }
     }

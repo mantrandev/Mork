@@ -2,38 +2,114 @@
 set -euo pipefail
 
 BUNDLE_ID="${MORK_BUNDLE_ID:-dev.mantrandev.mork}"
+VERSION="dev"
 
 usage() {
     cat <<USAGE
-Usage: mork [folder]
+Usage: mork [-C <folder>] [<folder> | <file> | <command>]
 
 Open a Git repository in Mork.
 
-  mork            open the repository of the current folder
-  mork <folder>   open the repository that contains <folder>
-  mork <file>     open the repository that contains <file>
+  mork                  open the repository of the current folder
+  mork <folder>         open the repository that contains <folder>
+  mork <file>           open the repository that contains <file>
+  mork open [<path>]    same as above
+  mork status           open the Changes view
+  mork commit           open the Changes view
+  mork log              open the commit history
+  mork log -- <file>    open the history of <file>
+
+Options:
+  -C <folder>           run as if mork was started in <folder>
+  -h, --help            show this help
+  -v, --version         show the version
 USAGE
 }
 
+fail() {
+    echo "mork: $2" >&2
+    exit "$1"
+}
+
+encode() {
+    local LC_ALL=C text="$1" out="" char code i
+    for ((i = 0; i < ${#text}; i++)); do
+        char="${text:i:1}"
+        case "$char" in
+            [a-zA-Z0-9/._~-]) out+="$char" ;;
+            *) printf -v code '%d' "'$char"; printf -v char '%%%02X' $((code & 255)); out+="$char" ;;
+        esac
+    done
+    printf '%s' "$out"
+}
+
+while [ "$#" -gt 0 ]; do
+    case "$1" in
+        -h|--help) usage; exit 0 ;;
+        -v|--version) echo "mork $VERSION"; exit 0 ;;
+        -C)
+            if [ "$#" -lt 2 ]; then usage >&2; exit 64; fi
+            cd "$2" 2>/dev/null || fail 66 "$2: no such folder"
+            shift 2
+            ;;
+        -*) echo "mork: unknown option $1" >&2; usage >&2; exit 64 ;;
+        *) break ;;
+    esac
+done
+
+target="."
+view=""
+file=""
+
 case "${1:-}" in
-    -h|--help) usage; exit 0 ;;
+    "") ;;
+    open)
+        shift
+        if [ "$#" -gt 0 ]; then target="$1"; shift; fi
+        ;;
+    status|commit)
+        view="changes"
+        shift
+        ;;
+    log)
+        view="history"
+        shift
+        if [ "${1:-}" = "--" ]; then shift; fi
+        if [ "$#" -gt 0 ]; then file="$1"; shift; fi
+        ;;
+    *)
+        target="$1"
+        shift
+        ;;
 esac
 
-if [ "$#" -gt 1 ]; then
+if [ "$#" -gt 0 ]; then
     usage >&2
     exit 64
 fi
 
-target="${1:-.}"
-
-if [ ! -e "$target" ]; then
-    echo "mork: $target: no such file or folder" >&2
-    exit 66
+if [ -n "$file" ]; then
+    [ -e "$file" ] || fail 66 "$file: no such file"
+    [ ! -d "$file" ] || fail 64 "$file: is a folder, not a file"
+    target="$(dirname "$file")"
+    file="$(cd "$target" && pwd -P)/$(basename "$file")"
 fi
+
+[ -e "$target" ] || fail 66 "$target: no such file or folder"
 
 if [ ! -d "$target" ]; then
     target="$(dirname "$target")"
 fi
 
 folder="$(cd "$target" && pwd -P)"
-open -b "$BUNDLE_ID" "$folder"
+
+if [ -z "$view" ]; then
+    open -b "$BUNDLE_ID" "$folder"
+    exit 0
+fi
+
+url="mork://open?path=$(encode "$folder")&view=$view"
+if [ -n "$file" ]; then
+    url+="&file=$(encode "$file")"
+fi
+open -b "$BUNDLE_ID" "$url"

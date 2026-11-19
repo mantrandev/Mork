@@ -54,7 +54,7 @@ xcrun actool "$ICON_BUILD/source/AppIcon.icon" "$ICON_BUILD/source/Accent.xcasse
     --output-partial-info-plist "$ICON_BUILD/partial.plist" >/dev/null
 cp "$ICON_BUILD/Assets.car" "$CONTENTS/Resources/Assets.car"
 cp "Assets/$ICON.icns" "$CONTENTS/Resources/AppIcon.icns"
-sed "s/MORK_BUNDLE_ID:-dev.mantrandev.mork}/MORK_BUNDLE_ID:-$BUNDLE_ID}/" scripts/mork > "$CONTENTS/Resources/mork"
+sed -e "s/MORK_BUNDLE_ID:-dev.mantrandev.mork}/MORK_BUNDLE_ID:-$BUNDLE_ID}/" -e "s/^VERSION=\"dev\"$/VERSION=\"$VERSION\"/" scripts/mork > "$CONTENTS/Resources/mork"
 chmod 755 "$CONTENTS/Resources/mork"
 cp LICENSE "$CONTENTS/Resources/LICENSE"
 cp THIRD_PARTY_NOTICES "$CONTENTS/Resources/THIRD_PARTY_NOTICES"
@@ -94,6 +94,17 @@ cat > "$CONTENTS/Info.plist" <<PLIST
             <key>LSItemContentTypes</key>
             <array>
                 <string>public.folder</string>
+            </array>
+        </dict>
+    </array>
+    <key>CFBundleURLTypes</key>
+    <array>
+        <dict>
+            <key>CFBundleURLName</key>
+            <string>$BUNDLE_ID</string>
+            <key>CFBundleURLSchemes</key>
+            <array>
+                <string>mork</string>
             </array>
         </dict>
     </array>
