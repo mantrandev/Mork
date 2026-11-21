@@ -318,9 +318,8 @@ public final class RepositoryViewModel {
     @ObservationIgnored private var refreshReportsErrors = false
     @ObservationIgnored private var filterTask: Task<Void, Never>?
     @ObservationIgnored private var historyPageTask: Task<Void, Never>?
-    @ObservationIgnored private var isAppActive = true
+    @ObservationIgnored var isAppActive = true
     @ObservationIgnored private var changedWhileInactive = false
-    private var changedDuringAction = false
     @ObservationIgnored private let watch = WatchSubscription()
 
     public init(
@@ -827,12 +826,7 @@ public final class RepositoryViewModel {
         } catch {
             failure = error
         }
-        changedDuringAction = false
         await refresh()
-        if changedDuringAction {
-            changedDuringAction = false
-            await refresh(reportingErrors: false)
-        }
         guard let failure else { return true }
         let stoppedOnConflicts = stateBefore == .clean && repositoryState != .clean && !conflictedChanges.isEmpty
         if !stoppedOnConflicts {
@@ -859,7 +853,11 @@ public final class RepositoryViewModel {
     public func setAppActive(_ active: Bool) {
         guard isAppActive != active else { return }
         isAppActive = active
-        if active, isAutoFetching { restartAutoFetch() }
+        if active {
+            if autoFetch.isPaused { restartAutoFetch() }
+        } else if isAutoFetching {
+            autoFetch.pause()
+        }
         guard active, changedWhileInactive else { return }
         changedWhileInactive = false
         Task { await refresh(reportingErrors: false) }
@@ -870,10 +868,7 @@ public final class RepositoryViewModel {
             changedWhileInactive = true
             return
         }
-        guard !isBusy else {
-            changedDuringAction = true
-            return
-        }
+        guard !isBusy else { return }
         await refresh(reportingErrors: false)
     }
 
