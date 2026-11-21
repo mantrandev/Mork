@@ -65,7 +65,7 @@ struct DetailView: View {
                 LFSPointerView(change: pointer)
             } else if let document = viewModel.diffDocument {
                 if document.isCollapsed {
-                    LargeDiffPlaceholder(lineCount: document.totalLines, show: viewModel.showLargeDiff)
+                    LargeDiffPlaceholder(size: document.sizeSummary, show: viewModel.showLargeDiff)
                 } else if case .commit = viewModel.selection, !document.hasFileHeader {
                     EmptyStateView("No File Selected", systemImage: "doc.text", message: "Select a changed file to see its diff.")
                         .accessibilityIdentifier("detail.empty")
@@ -149,11 +149,11 @@ struct DetailView: View {
 }
 
 struct LargeDiffPlaceholder: View {
-    let lineCount: Int
+    let size: String
     let show: () -> Void
 
     var body: some View {
-        EmptyStateView("Large Diff", systemImage: "doc.text.magnifyingglass", message: "This diff has \(lineCount.formatted()) lines. It is hidden to keep the app responsive.") {
+        EmptyStateView("Large Diff", systemImage: "doc.text.magnifyingglass", message: "This diff has \(size). It is hidden to keep the app responsive.") {
             Button("Show Anyway", action: show)
                 .buttonStyle(.morkSecondary)
                 .accessibilityIdentifier("diff.showLarge")

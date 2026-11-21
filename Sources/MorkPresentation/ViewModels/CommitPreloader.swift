@@ -8,6 +8,10 @@ final class CommitPreloader {
         let document: DiffDocument
         let submoduleSummary: String?
         let lfsPointer: LFSPointerChange?
+
+        var cost: Int {
+            text.utf8.count + document.cost
+        }
     }
 
     struct PreparedDetail: Sendable {
@@ -19,7 +23,7 @@ final class CommitPreloader {
         var files: [String: PreparedFile] = [:]
 
         var cost: Int {
-            files.values.reduce(text.utf8.count) { $0 + $1.text.utf8.count }
+            files.values.reduce(text.utf8.count + document.cost) { $0 + $1.cost }
         }
     }
 
@@ -30,6 +34,7 @@ final class CommitPreloader {
     private var summaryTasks: [String: Task<Result<CommitSummary, Error>, Never>] = [:]
     private var detailTasks: [String: Task<Result<PreparedDetail, Error>, Never>] = [:]
     private var order: [String] = []
+    private var oversized: Set<String> = []
     var hoverTask: Task<Void, Never>?
     var hoveredHash: String?
 
@@ -44,6 +49,10 @@ final class CommitPreloader {
 
     func detail(of hash: String, tabWidth: Int) -> PreparedDetail? {
         details[hash].flatMap { $0.tabWidth == tabWidth ? $0 : nil }
+    }
+
+    func isOversized(_ hash: String) -> Bool {
+        oversized.contains(hash)
     }
 
     func pendingDetail(of hash: String) -> Task<Result<PreparedDetail, Error>, Never>? {
@@ -79,6 +88,7 @@ final class CommitPreloader {
     func clearDetails() {
         details = [:]
         detailTasks = [:]
+        oversized = []
     }
 
     func releaseMemory() {
@@ -100,7 +110,18 @@ final class CommitPreloader {
 
     private func finishDetail(_ hash: String, _ result: Result<PreparedDetail, Error>) {
         detailTasks[hash] = nil
-        guard case let .success(detail) = result, order.contains(hash), detail.cost <= byteBudget else { return }
+        guard order.contains(hash) else { return }
+        let detail: PreparedDetail
+        switch result {
+        case let .success(loaded) where loaded.cost <= byteBudget:
+            detail = loaded
+        case .success:
+            oversized.insert(hash)
+            return
+        case let .failure(error):
+            if case .outputTooLarge = error as? GitDomainError { oversized.insert(hash) }
+            return
+        }
         details[hash] = detail
         var total = details.values.reduce(0) { $0 + $1.cost }
         for evicted in order where total > byteBudget && evicted != hash {
@@ -116,6 +137,7 @@ final class CommitPreloader {
             let evicted = order.removeFirst()
             summaries[evicted] = nil
             details[evicted] = nil
+            oversized.remove(evicted)
         }
     }
 }

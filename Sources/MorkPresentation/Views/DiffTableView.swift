@@ -278,7 +278,7 @@ struct DiffTableView: NSViewRepresentable {
 
         private func columns(of line: DiffLine, tabWidth: Int) -> Int {
             if let cached = columnCounts[line.id] { return cached }
-            let count = DiffTabs.columns(of: line.text, width: tabWidth)
+            let count = DiffTabs.columns(of: line.displayText, width: tabWidth)
             columnCounts[line.id] = count
             return count
         }
@@ -383,7 +383,7 @@ struct DiffTableView: NSViewRepresentable {
 
         private func text(for line: DiffLine) -> NSAttributedString {
             if let cached = attributed[line.id] { return cached }
-            guard let view else { return NSAttributedString(string: line.text) }
+            guard let view else { return NSAttributedString(string: line.displayText) }
             let metrics = view.metrics
             let result = DiffLineText.make(line, font: font, tabWidth: metrics.tabWidth, showsInvisibles: metrics.showsInvisibles, wrapLineHeight: metrics.wrapsLines ? metrics.lineHeight : nil)
             attributed[line.id] = result
@@ -475,7 +475,7 @@ private enum DiffCellID {
 
 enum DiffLineText {
     static func make(_ line: DiffLine, font: NSFont, tabWidth: Int, showsInvisibles: Bool = false, prefixed: Bool = true, wrapLineHeight: CGFloat? = nil) -> NSAttributedString {
-        let expanded = DiffTabs.expand(line.text, changed: line.changed, width: tabWidth, marksInvisiblesAfter: showsInvisibles ? invisiblesStart(of: line, prefixed: prefixed) : nil)
+        let expanded = DiffTabs.expand(line.displayText, changed: line.changed, width: tabWidth, marksInvisiblesAfter: showsInvisibles ? invisiblesStart(of: line, prefixed: prefixed) : nil)
         let string = expanded.text.isEmpty ? " " : expanded.text
         let color = line.kind == .meta ? Palette.Text.secondary.nsColor : Palette.Text.primary.nsColor
         let result = NSMutableAttributedString(string: string, attributes: [.font: font, .foregroundColor: color])
@@ -666,7 +666,7 @@ final class DiffLineCell: NSView {
         if let source {
             setAccessibilityElement(true)
             setAccessibilityRole(.button)
-            setAccessibilityLabel(line.text)
+            setAccessibilityLabel(line.displayText)
             setAccessibilityValue(isSelected ? "selected" : "")
             setAccessibilityIdentifier("diff.line.\(source.hunk).\(source.line)")
         } else {

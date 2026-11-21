@@ -289,7 +289,7 @@ public final class RepositoryViewModel {
     public let signatureBadges = SignatureBadgeStore()
     public let commitMessages = CommitMessageStore()
     let preloader = CommitPreloader(capacity: RepositoryViewModel.commitPreloadCapacity, byteBudget: RepositoryViewModel.commitPreloadByteBudget)
-    let workingDiffs = WorkingCopyDiffCache(capacity: RepositoryViewModel.commitPreloadCapacity)
+    let workingDiffs = WorkingCopyDiffCache(capacity: RepositoryViewModel.commitPreloadCapacity, byteBudget: RepositoryViewModel.workingDiffByteBudget)
     public let advanced = AdvancedTools()
     public internal(set) var customCommandMenus: [CustomCommandLocation: [CustomCommand]] = [:]
     public var pendingCustomCommand: PendingCustomCommand?
@@ -1033,7 +1033,7 @@ public final class RepositoryViewModel {
             let showsLarge = request.showsLarge
             let path = request.path
             let prepared = await Task.detached(priority: .userInitiated) {
-                let patch = isFile ? DiffParser.parse(text).first : nil
+                let patch = isFile && !DiffDocument.collapses(text, showsLarge: showsLarge) ? DiffParser.parse(text).first : nil
                 let usable = patch.flatMap { usesPatch && !$0.hunks.isEmpty ? $0 : nil }
                 let document = DiffDocument.make(text: text, patch: usable, isCommit: isCommit, tabWidth: tabWidth, showsLarge: showsLarge)
                 return (patch, document, Self.submoduleSummary(of: text, path: path), Self.lfsPointerChange(of: text))

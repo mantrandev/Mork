@@ -3,7 +3,7 @@ import Foundation
 
 extension RepositoryViewModel {
     public static let commitPreloadCapacity = 32
-    public static let commitPreloadByteBudget = 4 * 1024 * 1024
+    public static let commitPreloadByteBudget = 16 * 1024 * 1024
     public static let hoverPrefetchDelay: Duration = .milliseconds(80)
 
     public func prefetchCommit(_ commit: Commit) {
@@ -12,7 +12,7 @@ extension RepositoryViewModel {
     }
 
     private func needsDetailPrefetch(_ commit: Commit) -> Bool {
-        commitDetailsTab == .changes && !settings.diff.showsEntireFile && preloader.detail(of: commit.hash, tabWidth: settings.diff.tabWidth) == nil
+        commitDetailsTab == .changes && !settings.diff.showsEntireFile && preloader.detail(of: commit.hash, tabWidth: settings.diff.tabWidth) == nil && !preloader.isOversized(commit.hash)
     }
 
     public func endHover(_ commit: Commit) {
@@ -59,6 +59,7 @@ extension RepositoryViewModel {
     func commitDetailTask(for commit: Commit) -> Task<Result<CommitPreloader.PreparedDetail, Error>, Never> {
         let load = dependencies.loadCommitDetails
         let tabWidth = settings.diff.tabWidth
+        let byteBudget = preloader.byteBudget
         return preloader.loadDetail(commit.hash, tabWidth: tabWidth) {
             let text = try await load.execute(commit: commit)
             return await Task.detached(priority: .userInitiated) {
@@ -68,7 +69,7 @@ extension RepositoryViewModel {
                     submoduleSummary: Self.submoduleSummary(of: text, path: nil),
                     lfsPointer: Self.lfsPointerChange(of: text),
                     tabWidth: tabWidth,
-                    files: Self.preparedFiles(of: text, tabWidth: tabWidth)
+                    files: text.utf8.count > byteBudget ? [:] : Self.preparedFiles(of: text, tabWidth: tabWidth)
                 )
             }.value
         }

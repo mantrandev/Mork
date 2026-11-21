@@ -11,14 +11,17 @@ final class WorkingCopyDiffCache {
     typealias Loaded = RepositoryViewModel.LoadedDetail
 
     let capacity: Int
+    let byteBudget: Int
     private var entries: [Key: Loaded] = [:]
+    private var oversized: Set<Key> = []
     private var tasks: [Key: Task<Loaded, Never>] = [:]
     private var order: [Key] = []
     private var generation = 0
     var hoverTask: Task<Void, Never>?
 
-    init(capacity: Int) {
+    init(capacity: Int, byteBudget: Int) {
         self.capacity = capacity
+        self.byteBudget = byteBudget
     }
 
     func detail(of key: Key) -> Loaded? {
@@ -26,7 +29,7 @@ final class WorkingCopyDiffCache {
     }
 
     func isKnown(_ key: Key) -> Bool {
-        entries[key] != nil || tasks[key] != nil
+        entries[key] != nil || tasks[key] != nil || oversized.contains(key)
     }
 
     func load(_ key: Key, _ body: @escaping @Sendable () async -> Loaded) -> Task<Loaded, Never> {
@@ -46,6 +49,7 @@ final class WorkingCopyDiffCache {
         entries = [:]
         tasks = [:]
         order = []
+        oversized = []
     }
 
     var pendingTasks: [Task<Void, Never>] {
@@ -56,11 +60,25 @@ final class WorkingCopyDiffCache {
         guard generation == self.generation else { return }
         tasks[key] = nil
         guard case .loaded = loaded.result else { return }
+        let cost = loaded.cost
+        guard cost <= byteBudget else {
+            oversized.insert(key)
+            return
+        }
         entries[key] = loaded
         order.removeAll { $0 == key }
         order.append(key)
-        while order.count > capacity {
-            entries[order.removeFirst()] = nil
+        var total = order.reduce(0) { $0 + (entries[$1]?.cost ?? 0) }
+        while order.count > capacity || total > byteBudget {
+            total -= entries.removeValue(forKey: order.removeFirst())?.cost ?? 0
         }
+    }
+}
+
+extension RepositoryViewModel.LoadedDetail {
+    var cost: Int {
+        guard case let .loaded(text) = result else { return 0 }
+        let bytes = text.utf8.count
+        return bytes + (prepared?.patch == nil ? 0 : bytes) + (prepared?.document.cost ?? 0)
     }
 }

@@ -7,6 +7,7 @@ import Observation
 public final class LocalChangesComparisonViewModel: Identifiable {
     public nonisolated static let loadingIndicatorDelay: Duration = .milliseconds(150)
     public nonisolated static let cachedDiffLimit = 64
+    public nonisolated static let cachedDiffByteBudget = 16 * 1_048_576
 
     public let commit: Commit
     public private(set) var files: Loadable<LocalChangesComparison> = .idle
@@ -189,10 +190,12 @@ public final class LocalChangesComparisonViewModel: Identifiable {
     }
 
     private func remember(_ document: DiffDocument, for id: String) {
+        guard document.cost <= Self.cachedDiffByteBudget else { return }
         if cache.updateValue(document, forKey: id) != nil { cacheOrder.removeAll { $0 == id } }
         cacheOrder.append(id)
-        while cacheOrder.count > Self.cachedDiffLimit {
-            cache[cacheOrder.removeFirst()] = nil
+        var total = cache.values.reduce(0) { $0 + $1.cost }
+        while cacheOrder.count > Self.cachedDiffLimit || total > Self.cachedDiffByteBudget {
+            total -= cache.removeValue(forKey: cacheOrder.removeFirst())?.cost ?? 0
         }
     }
 

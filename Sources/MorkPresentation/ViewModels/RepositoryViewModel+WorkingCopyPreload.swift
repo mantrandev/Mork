@@ -2,6 +2,8 @@ import MorkDomain
 import Foundation
 
 extension RepositoryViewModel {
+    public static let workingDiffByteBudget = 16 * 1_048_576
+
     public func prefetchChange(_ change: FileChange, staged: Bool) {
         _ = workingDiffTask(for: WorkingCopyDiffCache.Key(change: change, staged: staged))
     }

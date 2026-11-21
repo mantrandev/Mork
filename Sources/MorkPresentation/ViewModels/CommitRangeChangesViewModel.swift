@@ -7,6 +7,7 @@ import Observation
 public final class CommitRangeChangesViewModel {
     public nonisolated static let cachedListLimit = 16
     public nonisolated static let cachedDiffLimit = 64
+    public nonisolated static let cachedDiffByteBudget = 16 * 1_048_576
 
     private struct Listing {
         let files: [ComparedFile]
@@ -164,9 +165,13 @@ public final class CommitRangeChangesViewModel {
     }
 
     private func remember(_ document: DiffDocument, for key: String) {
+        guard document.cost <= Self.cachedDiffByteBudget else { return }
         diffs[key] = document
         touch(key, in: &diffOrder)
-        while diffOrder.count > Self.cachedDiffLimit { diffs[diffOrder.removeFirst()] = nil }
+        var total = diffs.values.reduce(0) { $0 + $1.cost }
+        while diffOrder.count > Self.cachedDiffLimit || total > Self.cachedDiffByteBudget {
+            total -= diffs.removeValue(forKey: diffOrder.removeFirst())?.cost ?? 0
+        }
     }
 
     private func touch(_ key: String, in order: inout [String]) {
