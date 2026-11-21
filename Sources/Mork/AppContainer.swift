@@ -226,7 +226,7 @@ enum AppContainer {
                 continueOperation: ContinueOperationUseCase(revisions: revisions, workingCopy: workingCopy),
                 abortOperation: AbortOperationUseCase(revisions: revisions, workingCopy: workingCopy)
             ),
-            watchRepository: WatchRepositoryUseCase(watcher: FSEventsRepositoryWatcher()),
+            watchRepository: WatchRepositoryUseCase(watcher: FSEventsRepositoryWatcher(), ignoredPaths: ignore),
             rebase: RebaseDependencies(
                 loadRebaseSteps: LoadRebaseStepsUseCase(rebase: rebase, workingCopy: workingCopy),
                 runInteractiveRebase: RunInteractiveRebaseUseCase(rebase: rebase, workingCopy: workingCopy, branches: BranchActionsRepositoryImpl(executor: executor)),

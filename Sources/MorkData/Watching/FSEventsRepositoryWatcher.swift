@@ -4,20 +4,27 @@ import Foundation
 
 public final class FSEventsRepositoryWatcher: RepositoryWatcherProtocol {
     private let latency: TimeInterval
+    private let pathLimit: Int
 
-    public init(latency: TimeInterval = 0.05) {
+    public init(latency: TimeInterval = 0.05, pathLimit: Int = RepositoryChanges.limit) {
         self.latency = latency
+        self.pathLimit = pathLimit
     }
 
-    public func changes(in root: URL) -> AsyncStream<[String]> {
-        let (stream, continuation) = AsyncStream<[String]>.makeStream()
+    public func changes(in root: URL) -> AsyncStream<RepositoryChanges> {
+        let (stream, continuation) = AsyncStream<RepositoryChanges>.makeStream(bufferingPolicy: .bufferingNewest(1))
         guard let locations = WatchedLocations(root: root) else {
             continuation.finish()
             return stream
         }
+        let pathLimit = pathLimit
         let handle = EventStreamHandle { paths in
             let relative = paths.compactMap(locations.relativePath)
-            if !relative.isEmpty { continuation.yield(relative) }
+            guard !relative.isEmpty else { return }
+            let changes = RepositoryChanges(relative, limit: pathLimit)
+            if case .dropped(let unread) = continuation.yield(changes) {
+                continuation.yield(unread.merged(with: changes, limit: pathLimit))
+            }
         }
         guard handle.start(paths: locations.watchedPaths, latency: latency) else {
             continuation.finish()
