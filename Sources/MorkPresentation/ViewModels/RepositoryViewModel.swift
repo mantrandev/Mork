@@ -6,6 +6,7 @@ import Observation
 @Observable
 public final class RepositoryViewModel {
     public static let historyLimit = 500
+    public static let historyRevealLimit = 5_000
     static let historyPrefetchDistance = 100
 
     public enum Pane: String, CaseIterable, Identifiable, Sendable {
@@ -318,6 +319,8 @@ public final class RepositoryViewModel {
     @ObservationIgnored private var refreshReportsErrors = false
     @ObservationIgnored private var filterTask: Task<Void, Never>?
     @ObservationIgnored private var historyPageTask: Task<Void, Never>?
+    @ObservationIgnored private var historyTrimTask: Task<Void, Never>?
+    @ObservationIgnored private var isDetailReleased = false
     @ObservationIgnored var isAppActive = true
     @ObservationIgnored private var changedWhileInactive = false
     @ObservationIgnored private let watch = WatchSubscription()
@@ -380,6 +383,49 @@ public final class RepositoryViewModel {
         preloader.releaseMemory()
         workingDiffs.clear()
         rangeChanges.releaseMemory()
+        fileTree?.releaseMemory()
+    }
+
+    public func hibernate() {
+        releaseMemory()
+        commitMessages.clear()
+        signatureBadges.clear()
+        imageDiff?.cancel()
+        imageDiff = nil
+        detailTask?.cancel()
+        clearDetail()
+        isDetailReleased = selection != nil
+        trimHistory()
+    }
+
+    public func waitForHistoryTrim() async {
+        await historyTrimTask?.value
+    }
+
+    private func trimHistory() {
+        historyTrimTask?.cancel()
+        historyTrimTask = nil
+        let selectedIndex = selectedCommit.flatMap { presentation.historyIndex[$0.hash] }
+        let keep = selectedIndex.map { ($0 + 1).roundedUp(to: Self.historyLimit) }.flatMap { $0 <= Self.historyRevealLimit ? $0 : nil } ?? Self.historyLimit
+        let snapshot = presentation.snapshot
+        guard snapshot.historyCursor.loadedCommits > keep else { return }
+        historyPageTask?.cancel()
+        historyPageTask = nil
+        isLoadingMoreHistory = false
+        let version = presentationVersion
+        historyTrimTask = Task { [weak self] in
+            let trimmed = await Task.detached(priority: .utility) { RepositoryPresentation.trimmingHistory(of: snapshot, toCommits: keep) }.value
+            guard let self, !Task.isCancelled, let trimmed, version == self.presentationVersion else { return }
+            await self.present(trimmed)
+        }
+    }
+
+    public func cancelRefresh() {
+        refreshLoop?.cancel()
+        refreshLoop = nil
+        refreshRequested = false
+        refreshReportsErrors = false
+        if isLoading { isLoading = false }
     }
 
     public func refresh(reportingErrors: Bool = true) async {
@@ -395,13 +441,13 @@ public final class RepositoryViewModel {
     }
 
     private func runRefreshLoop() async {
-        while refreshRequested {
+        while refreshRequested, !Task.isCancelled {
             refreshRequested = false
             let reportingErrors = refreshReportsErrors
             refreshReportsErrors = false
             await refreshOnce(reportingErrors: reportingErrors)
         }
-        refreshLoop = nil
+        if !Task.isCancelled { refreshLoop = nil }
     }
 
     private func refreshOnce(reportingErrors: Bool) async {
@@ -420,23 +466,28 @@ public final class RepositoryViewModel {
             async let amended = amending ? dependencies.commit.loadWorkingCopyChanges.execute(amending: true) : nil
             var loaded = try await dependencies.loadSnapshot.execute(historyLimit: limit, options: historyOptions)
             if let amended = try await amended { loaded = loaded.replacingChanges(amended) }
+            guard !Task.isCancelled else { return }
             if amending != isAmending {
                 loaded = loaded.replacingChanges(presentation.snapshot.changes)
                 refreshRequested = true
             }
             ignoredChanges = await ignored
+            guard !Task.isCancelled else { return }
             if hasLoaded, let branch = loaded.branches.first(where: \.isCurrent), branch.fullName != currentBranch?.fullName {
                 rememberBranch(branch, among: loaded.branches)
             }
             await present(loaded)
+            guard !Task.isCancelled else { return }
             if isSearchActive { scheduleSearch() }
         } catch {
+            guard !Task.isCancelled else { return }
             if reportingErrors, !refreshRequested { errorMessage = error.localizedDescription }
         }
         let isFirstLoad = !hasLoaded
         hasLoaded = true
         if isLoading { isLoading = false }
         reconcileSelection()
+        restoreReleasedDetail()
         advanceConflictWindow()
         reconcileSidebarItem()
         if isFirstLoad, isAutoFetching, autoFetch.lastAttempt == nil { restartAutoFetch() }
@@ -456,6 +507,7 @@ public final class RepositoryViewModel {
             let (next, changed) = await Task.detached(priority: .userInitiated) {
                 RepositoryPresentation.present(snapshot, after: previous, branchFilter: branchFilter, changesFilter: changesFilter, changeListOptions: changeListOptions, ignored: ignored, options: options, sidebarOptions: sidebarOptions)
             }.value
+            guard !Task.isCancelled else { return }
             guard version == presentationVersion else { continue }
             apply(next, changed)
             return
@@ -870,6 +922,13 @@ public final class RepositoryViewModel {
         }
         guard !isBusy else { return }
         await refresh(reportingErrors: false)
+    }
+
+    private func restoreReleasedDetail() {
+        guard isDetailReleased else { return }
+        isDetailReleased = false
+        guard selection != nil, detail == .empty else { return }
+        reloadDetail()
     }
 
     private func reconcileSelection() {

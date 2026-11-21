@@ -225,7 +225,8 @@ extension RepositoryViewModel {
     }
 
     private func loadHistory(through hash: String) async {
-        while loadedCommit(hash: hash) == nil, hasMoreHistory, !Task.isCancelled {
+        while loadedCommit(hash: hash) == nil, hasMoreHistory, !Task.isCancelled,
+              presentation.snapshot.historyCursor.loadedCommits < Self.historyRevealLimit {
             let loaded = historyRows.count
             loadMoreHistory()
             await waitForHistoryPage()

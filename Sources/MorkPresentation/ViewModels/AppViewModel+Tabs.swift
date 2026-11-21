@@ -398,11 +398,14 @@ extension AppViewModel {
     func deactivate(_ tab: RepositoryViewModel) {
         tab.stopWatching()
         tab.stopAutoFetch()
-        tab.releaseMemory()
+        tab.cancelRefresh()
+        tab.hibernate()
     }
 
     public func releaseMemory() {
-        for tab in tabs { tab.releaseMemory() }
+        for tab in tabs {
+            if tab === repository { tab.releaseMemory() } else { tab.hibernate() }
+        }
     }
 
     private func rememberClosed(_ url: URL) {

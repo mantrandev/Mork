@@ -30,6 +30,12 @@ public final class SignatureBadgeStore {
         return batch
     }
 
+    func clear() {
+        statuses = [:]
+        requested = []
+        pending = []
+    }
+
     func store(_ results: [String: CommitSignature], for batch: [String]) {
         var updated = statuses
         for hash in batch { updated[hash] = results[hash] ?? CommitSignature.none }
