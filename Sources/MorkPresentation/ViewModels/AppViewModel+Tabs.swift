@@ -95,12 +95,27 @@ extension AppViewModel {
         }
     }
 
+    public func windowDidHide() {
+        guard !isWindowHidden else { return }
+        isWindowHidden = true
+        prefetchTask?.cancel()
+        prefetchTask = nil
+        repository.map(deactivate)
+    }
+
+    public func windowDidShow() {
+        guard isWindowHidden else { return }
+        isWindowHidden = false
+        repository.map(resume)
+        schedulePrefetch()
+    }
+
     public func waitForPrefetch() async {
         await prefetchTask?.value
     }
 
     func schedulePrefetch() {
-        guard isAppActive else { return }
+        guard isAppActive, !isWindowHidden else { return }
         prefetchTask?.cancel()
         prefetchTask = Task(priority: .utility) { [weak self] in
             await self?.activationTask?.value
@@ -371,6 +386,10 @@ extension AppViewModel {
     func activate(_ tab: RepositoryViewModel) {
         repository.map(deactivate)
         repository = tab
+        resume(tab)
+    }
+
+    private func resume(_ tab: RepositoryViewModel) {
         tab.apply(appliedSettings)
         tab.startWatching()
         activationTask = Task { await tab.refresh() }
@@ -404,7 +423,7 @@ extension AppViewModel {
 
     public func releaseMemory() {
         for tab in tabs {
-            if tab === repository { tab.releaseMemory() } else { tab.hibernate() }
+            if tab === repository, !isWindowHidden { tab.releaseMemory() } else { tab.hibernate() }
         }
     }
 
