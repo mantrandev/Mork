@@ -27,7 +27,9 @@ struct MainWindow: View {
             model?.releaseMemory()
         }
         .onDisappear {
-            if model === primary { Self.isPrimaryShown = false }
+            guard model === primary else { return }
+            Self.isPrimaryShown = false
+            primary.windowDidHide()
         }
     }
 
@@ -41,6 +43,7 @@ struct MainWindow: View {
         }
         Self.isPrimaryShown = true
         model = primary
+        primary.windowDidShow()
         if let size = options.windowSize, let window = NSApp.windows.first(where: { $0.isVisible && $0.styleMask.contains(.titled) }) {
             window.setContentSize(size)
             if let screen = NSScreen.screens.first, window.screen != screen {

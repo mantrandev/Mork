@@ -246,6 +246,34 @@ struct RepositoryPresentation: Sendable {
         return (next, changed)
     }
 
+    static func trimmingHistory(of snapshot: RepositorySnapshot, toCommits limit: Int) -> RepositorySnapshot? {
+        guard snapshot.historyCursor.loadedCommits > limit else { return nil }
+        var kept = 0
+        var end = 0
+        for row in snapshot.history {
+            guard kept < limit else { break }
+            if !row.commit.refNames.contains(where: StashHistory.isStashRef) { kept += 1 }
+            end += 1
+        }
+        guard end < snapshot.history.count else { return nil }
+        let history = Array(snapshot.history.prefix(end))
+        var lanes: [String?] = []
+        _ = CommitGraphLayout.layout(history.map(\.commit), lanes: &lanes)
+        return RepositorySnapshot(
+            branches: snapshot.branches,
+            changes: snapshot.changes,
+            history: history,
+            stashes: snapshot.stashes,
+            tags: snapshot.tags,
+            state: snapshot.state,
+            remotes: snapshot.remotes,
+            worktrees: snapshot.worktrees,
+            submodules: snapshot.submodules,
+            bisect: snapshot.bisect,
+            historyCursor: HistoryCursor(lanes: lanes, loadedCommits: kept, isComplete: false)
+        )
+    }
+
     func appending(_ page: HistoryPage, options: HistoryOptions) -> RepositoryPresentation {
         var next = self
         let offset = snapshot.history.count

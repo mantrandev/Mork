@@ -47,6 +47,10 @@ extension RepositoryViewModel {
     func restartAutoFetch() {
         autoFetch.cancel()
         guard let interval = settings.autoFetch.duration else { return }
+        guard isAppActive else {
+            autoFetch.isPaused = true
+            return
+        }
         let sleep = sleep
         let firstWait = autoFetch.remaining(of: interval, at: now())
         autoFetch.task = Task { [weak self] in
@@ -78,6 +82,7 @@ extension RepositoryViewModel {
 final class AutoFetchState {
     var task: Task<Void, Never>?
     var lastAttempt: ContinuousClock.Instant?
+    var isPaused = false
 
     func remaining(of interval: Duration, at now: ContinuousClock.Instant) -> Duration {
         guard let lastAttempt else { return .zero }
@@ -87,6 +92,12 @@ final class AutoFetchState {
     func cancel() {
         task?.cancel()
         task = nil
+        isPaused = false
+    }
+
+    func pause() {
+        cancel()
+        isPaused = true
     }
 
     deinit {

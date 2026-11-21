@@ -39,6 +39,12 @@ final class BlobContentCache {
         return entry.blob
     }
 
+    func removeAll() {
+        entries = [:]
+        order = []
+        totalCost = 0
+    }
+
     func insert(_ blob: PreparedBlob, for id: String, cost: Int) {
         guard cost <= capacity else { return }
         if let old = entries[id] {
@@ -360,6 +366,10 @@ public final class CommitTreeViewModel: Identifiable {
 
     func temporaryCopy(of entry: TreeEntry) -> URL {
         temporaryDirectory.appendingPathComponent(commit.shortHash).appendingPathComponent(entry.path)
+    }
+
+    public func releaseMemory() {
+        blobs.removeAll()
     }
 
     public func close() {

@@ -32,7 +32,7 @@ public final class AppViewModel {
     }
     public internal(set) var expandedRepositoryTabWidth = Metrics.RepositoryTab.expandedMinimumWidth
     @ObservationIgnored private var measuredRepositoryTabTitle: String?
-    private var lastRepository: RepositoryViewModel?
+    @ObservationIgnored private weak var lastRepository: RepositoryViewModel?
     public var retainedRepository: RepositoryViewModel? {
         repository ?? lastRepository.flatMap { last in tabs.contains { $0 === last } ? last : nil }
     }
@@ -112,6 +112,7 @@ public final class AppViewModel {
     @ObservationIgnored var appliedSettings: AppSettings
     @ObservationIgnored var prefetchTask: Task<Void, Never>?
     @ObservationIgnored var isAppActive = true
+    @ObservationIgnored var isWindowHidden = false
     public let isPrimaryWindow: Bool
     @ObservationIgnored private weak var primaryWindow: AppViewModel?
     @ObservationIgnored private var otherWindows: [WeakWindow] = []

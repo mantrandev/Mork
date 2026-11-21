@@ -34,6 +34,12 @@ public final class CommitMessageStore {
         messages.merge(results) { _, new in new }
     }
 
+    func clear() {
+        messages = [:]
+        requested = []
+        pending = []
+    }
+
     func remember(_ message: String, for hash: String) {
         guard messages[hash] != message else { return }
         messages[hash] = message
