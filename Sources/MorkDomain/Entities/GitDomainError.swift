@@ -17,6 +17,7 @@ public enum GitDomainError: LocalizedError, Sendable, Equatable {
     case invalidIgnorePattern
     case notAMailboxPatch
     case emptyPatch
+    case outputTooLarge(limit: Int)
 
     public var errorDescription: String? {
         switch self {
@@ -52,6 +53,8 @@ public enum GitDomainError: LocalizedError, Sendable, Equatable {
             "git am needs a mailbox patch made by git format-patch (it starts with \"From <commit>\"). Apply this file with git apply instead."
         case .emptyPatch:
             "The file contains no diff that git could apply."
+        case let .outputTooLarge(limit):
+            "This output is larger than \(limit / 1_048_576) MB, so Mork stopped reading it to keep memory low. Open it in the terminal or an external diff tool."
         }
     }
 }

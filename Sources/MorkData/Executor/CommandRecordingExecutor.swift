@@ -30,6 +30,11 @@ public final class CommandRecordingExecutor: GitStreamingCommandExecuting {
         return try await base.runData(arguments, kind: kind, allowedExitCodes: allowedExitCodes)
     }
 
+    public func runData(_ arguments: [String], kind: GitCommandKind, allowedExitCodes: Set<Int32>?, byteLimit: Int) async throws -> Data {
+        record(arguments, input: nil)
+        return try await base.runData(arguments, kind: kind, allowedExitCodes: allowedExitCodes, byteLimit: byteLimit)
+    }
+
     public func run(_ arguments: [String], kind: GitCommandKind, allowedExitCodes: Set<Int32>?, onProgress: @escaping @Sendable (String) -> Void) async throws -> String {
         record(arguments, input: nil)
         return try await base.run(arguments, kind: kind, allowedExitCodes: allowedExitCodes, onProgress: onProgress)

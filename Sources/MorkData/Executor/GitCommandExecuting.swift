@@ -13,9 +13,21 @@ public protocol GitCommandExecuting: Sendable {
     func readLines(_ arguments: [String], matching lines: Set<String>) async throws -> [String]
 
     func runData(_ arguments: [String], kind: GitCommandKind, allowedExitCodes: Set<Int32>?) async throws -> Data
+
+    func runData(_ arguments: [String], kind: GitCommandKind, allowedExitCodes: Set<Int32>?, byteLimit: Int) async throws -> Data
+}
+
+public enum GitOutputLimit {
+    public static let diff = 32 * 1_048_576
 }
 
 extension GitCommandExecuting {
+    public func runData(_ arguments: [String], kind: GitCommandKind, allowedExitCodes: Set<Int32>?, byteLimit: Int) async throws -> Data {
+        let data = try await runData(arguments, kind: kind, allowedExitCodes: allowedExitCodes)
+        guard data.count <= byteLimit else { throw GitDomainError.outputTooLarge(limit: byteLimit) }
+        return data
+    }
+
     public func readLines(_ arguments: [String], matching lines: Set<String>) async throws -> [String] {
         GitOutputParser.lines(try await read(arguments)).filter { lines.contains($0) }
     }
@@ -35,6 +47,14 @@ extension GitCommandExecuting {
 
     func readLossless(_ arguments: [String], allowedExitCodes: Set<Int32>? = [0]) async throws -> String {
         LosslessText.decode(try await runData(arguments, kind: .read, allowedExitCodes: allowedExitCodes))
+    }
+
+    func readDiff(_ arguments: [String], allowedExitCodes: Set<Int32>? = [0]) async throws -> String {
+        LosslessText.decode(try await runData(arguments, kind: .read, allowedExitCodes: allowedExitCodes, byteLimit: GitOutputLimit.diff))
+    }
+
+    func readPatch(_ arguments: [String]) async throws -> String {
+        String(decoding: try await runData(arguments, kind: .read, allowedExitCodes: [0], byteLimit: GitOutputLimit.diff), as: UTF8.self)
     }
 
     @discardableResult

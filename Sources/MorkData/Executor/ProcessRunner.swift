@@ -4,6 +4,7 @@ struct ProcessOutput: Sendable {
     let exitCode: Int32
     let stdoutData: Data
     let stderr: String
+    var isTruncated = false
 
     var stdout: String { String(decoding: stdoutData, as: UTF8.self) }
 }
@@ -76,7 +77,7 @@ enum ProcessRunner {
         }
     }
 
-    static func run(_ arguments: [String], in directory: URL, input: Data? = nil, environment: [String: String] = [:], keepingOutputLines: Set<String>? = nil) throws -> ProcessOutput {
+    static func run(_ arguments: [String], in directory: URL, input: Data? = nil, environment: [String: String] = [:], keepingOutputLines: Set<String>? = nil, outputLimit: Int? = nil) throws -> ProcessOutput {
         let process = Process()
         configure(process, arguments: arguments)
         process.currentDirectoryURL = directory
@@ -112,6 +113,7 @@ enum ProcessRunner {
         errorReader.qualityOfService = quality
         errorReader.start()
         let outputData: Data
+        var isTruncated = false
         if let keepingOutputLines {
             var retained = Set<String>()
             var splitter = GitLineSplitter()
@@ -125,6 +127,21 @@ enum ProcessRunner {
                 retained.insert(line)
             }
             outputData = Data(retained.sorted().joined(separator: "\n").utf8)
+        } else if let outputLimit {
+            var data = Data()
+            let handle = output.fileHandleForReading
+            while case let chunk = handle.readData(ofLength: 65_536), !chunk.isEmpty {
+                data.append(chunk)
+                if data.count > outputLimit {
+                    isTruncated = true
+                    break
+                }
+            }
+            if isTruncated {
+                if process.isRunning { process.terminate() }
+                try? handle.close()
+            }
+            outputData = data
         } else {
             outputData = output.fileHandleForReading.readDataToEndOfFile()
         }
@@ -134,7 +151,8 @@ enum ProcessRunner {
         return ProcessOutput(
             exitCode: process.terminationStatus,
             stdoutData: outputData,
-            stderr: String(decoding: errorBuffer.data, as: UTF8.self)
+            stderr: String(decoding: errorBuffer.data, as: UTF8.self),
+            isTruncated: isTruncated
         )
     }
 }

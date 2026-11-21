@@ -27,7 +27,7 @@ public final class CommitRangeRepositoryImpl: CommitRangeRepositoryProtocol {
 
     public func diff(in range: CommitRange, file: CommitFileChange) async throws -> String {
         let paths = (file.originalPath.map { [$0] } ?? []) + [file.path]
-        return try await executor.readLossless(["--literal-pathspecs", "diff", "-M"] + diffOptions.diffOptions().arguments + [range.base(), range.head(), "--"] + paths)
+        return try await executor.readDiff(["--literal-pathspecs", "diff", "-M"] + diffOptions.diffOptions().arguments + [range.base(), range.head(), "--"] + paths)
     }
 
     public func formatPatches(of range: CommitRange, into folder: URL) async throws -> [String] {

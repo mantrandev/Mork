@@ -41,7 +41,7 @@ public final class HistoryRepositoryImpl: HistoryRepositoryProtocol {
     }
 
     public func details(of commit: Commit) async throws -> String {
-        try await executor.read(["show", "--stat", "--patch", "-M", "--diff-merges=first-parent"] + diffOptions.diffOptions().arguments + ["--format=fuller", commit.hash])
+        try await executor.readPatch(["show", "--stat", "--patch", "-M", "--diff-merges=first-parent"] + diffOptions.diffOptions().arguments + ["--format=fuller", commit.hash])
     }
 
     public func fullMessage(of commit: Commit) async throws -> String {
@@ -54,6 +54,6 @@ public final class HistoryRepositoryImpl: HistoryRepositoryProtocol {
 
     public func diff(of file: CommitFileChange, in commit: Commit) async throws -> String {
         let paths = [file.originalPath, file.path].compactMap { $0 }
-        return try await executor.read(["--literal-pathspecs", "show", "-M", "--diff-merges=first-parent"] + diffOptions.diffOptions().arguments + ["--format=", commit.hash, "--"] + paths)
+        return try await executor.readPatch(["--literal-pathspecs", "show", "-M", "--diff-merges=first-parent"] + diffOptions.diffOptions().arguments + ["--format=", commit.hash, "--"] + paths)
     }
 }
