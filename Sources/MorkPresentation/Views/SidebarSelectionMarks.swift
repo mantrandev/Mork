@@ -1,8 +1,6 @@
 import Observation
 
 @MainActor @Observable final class SidebarSelectionMarks {
-    @ObservationIgnored var onActivate: ((RepositoryViewModel.SidebarSelection) -> Void)?
-
     typealias Item = RepositoryViewModel.SidebarSelection
 
     @MainActor @Observable final class Mark {
@@ -25,5 +23,9 @@ import Observation
         for item in items.subtracting(next) { marks[item]?.isSelected = false }
         for item in next.subtracting(items) { marks[item]?.isSelected = true }
         items = next
+    }
+
+    func prune(keeping present: Set<Item>) {
+        marks = marks.filter { present.contains($0.key) || items.contains($0.key) }
     }
 }

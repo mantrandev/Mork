@@ -53,15 +53,19 @@ enum SidebarDoubleClick {
 
 struct SidebarDoubleClickMonitor: NSViewRepresentable {
     let marks: SidebarSelectionMarks
+    let onActivate: (RepositoryViewModel.SidebarSelection) -> Void
 
     func makeNSView(context: Context) -> MonitorView {
         MonitorView(marks: marks)
     }
 
-    func updateNSView(_ view: MonitorView, context: Context) {}
+    func updateNSView(_ view: MonitorView, context: Context) {
+        view.onActivate = onActivate
+    }
 
     final class MonitorView: NSView {
         private let marks: SidebarSelectionMarks
+        var onActivate: ((RepositoryViewModel.SidebarSelection) -> Void)?
         private var monitor: Any?
 
         init(marks: SidebarSelectionMarks) {
@@ -89,7 +93,7 @@ struct SidebarDoubleClickMonitor: NSViewRepresentable {
             guard let window, event.window === window, let frame = window.contentView?.superview else { return }
             let hit = frame.hitTest(frame.convert(event.locationInWindow, from: nil))
             guard let item = SidebarDoubleClick.item(at: event.locationInWindow, clickCount: event.clickCount, hit: hit, marks: marks) else { return }
-            marks.onActivate?(item)
+            onActivate?(item)
         }
     }
 }

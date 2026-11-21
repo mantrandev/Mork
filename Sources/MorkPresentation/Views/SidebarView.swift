@@ -68,12 +68,11 @@ struct SidebarView: View {
         .workspacePrompts(viewModel: viewModel, sheet: $workspaceSheet, confirmation: $workspaceConfirmation, onOpenRepository: onOpenRepository)
         .onAppear {
             if expandsAllSections { collapsedSections = [] }
-            marks.onActivate = activate
         }
         .background(CurrentBranchFolderExpander(viewModel: viewModel, toggled: $collapsedLocal))
         .branchDropDialog(viewModel)
         .background(SidebarSelectionSync(viewModel: viewModel, marks: marks))
-        .background(SidebarDoubleClickMonitor(marks: marks))
+        .background(SidebarDoubleClickMonitor(marks: marks, onActivate: activate))
         .morkConfirmation(isPresented: Binding(get: { !pendingTagDeletion.isEmpty }, set: { if !$0 { pendingTagDeletion = [] } })) {
             let tags = pendingTagDeletion
             return MorkConfirmation(
@@ -1018,7 +1017,24 @@ private struct SidebarSelectionSync: View {
                     if case let .branch(name) = item { return names.contains(name) }
                     return true
                 })
+                prune()
             }
+            .onChange(of: viewModel.remoteBranches) { prune() }
+            .onChange(of: viewModel.tags) { prune() }
+            .onChange(of: viewModel.stashes) { prune() }
+            .onChange(of: viewModel.worktrees) { prune() }
+            .onChange(of: viewModel.submodules) { prune() }
+    }
+
+    private func prune() {
+        var present = Set(RepositoryViewModel.Pane.allCases.map { RepositoryViewModel.SidebarSelection.pane($0) })
+        present.formUnion(viewModel.localBranches.map { .branch($0.name) })
+        present.formUnion(viewModel.remoteBranches.map { .remoteBranch($0.name) })
+        present.formUnion(viewModel.tags.map { .tag($0.name) })
+        present.formUnion(viewModel.stashes.map { .stash($0.reference) })
+        present.formUnion(viewModel.worktrees.map { .worktree($0.path) })
+        present.formUnion(viewModel.submodules.map { .submodule($0.path) })
+        marks.prune(keeping: present)
     }
 }
 

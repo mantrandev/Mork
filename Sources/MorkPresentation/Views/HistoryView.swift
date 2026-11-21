@@ -373,6 +373,10 @@ private struct HistoryRows: View, Equatable {
         for hash in hashes where !selectedHashes.contains(hash) { marks[hash]?.isSelected = true }
         selectedHashes = hashes
     }
+
+    func prune(keeping hashes: Set<String>) {
+        marks = marks.filter { hashes.contains($0.key) || selectedHashes.contains($0.key) }
+    }
 }
 
 enum HistoryRowBackground {
@@ -388,6 +392,7 @@ private struct HistorySelectionSync: View {
     var body: some View {
         Color.clear
             .onChange(of: viewModel.selectedCommitHashes, initial: true) { _, hashes in marks.select(hashes) }
+            .onChange(of: viewModel.visibleHistoryRows) { _, rows in marks.prune(keeping: Set(rows.map(\.commit.hash))) }
             .accessibilityHidden(true)
     }
 }
