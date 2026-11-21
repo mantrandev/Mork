@@ -1,7 +1,7 @@
 import MorkDomain
 import Foundation
 
-public final class IgnoreRepositoryImpl: IgnoreRepositoryProtocol {
+public final class IgnoreRepositoryImpl: IgnoreRepositoryProtocol, IgnoredPathsRepositoryProtocol {
     private let executor: GitCommandExecuting
 
     public init(executor: GitCommandExecuting) {
@@ -25,6 +25,12 @@ public final class IgnoreRepositoryImpl: IgnoreRepositoryProtocol {
         let fields = output.split(separator: "\0", omittingEmptySubsequences: false)
         guard fields.count >= 3, let line = Int(fields[1]) else { return nil }
         return IgnoreMatch(source: String(fields[0]), line: line, pattern: String(fields[2]))
+    }
+
+    public func ignoredPaths(_ paths: [String]) async throws -> Set<String> {
+        guard !paths.isEmpty else { return [] }
+        let output = try await executor.run(["check-ignore", "-z", "--stdin"], input: paths.joined(separator: "\0") + "\0", kind: .read, allowedExitCodes: [0, 1])
+        return Set(output.split(separator: "\0").map(String.init))
     }
 
     private func location(of target: IgnoreTarget) async throws -> URL {
