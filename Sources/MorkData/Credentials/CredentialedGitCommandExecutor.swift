@@ -93,6 +93,10 @@ public final class CredentialedGitCommandExecutor: GitStreamingCommandExecuting 
         try await base.runData(arguments, kind: kind, allowedExitCodes: allowedExitCodes)
     }
 
+    public func runData(_ arguments: [String], kind: GitCommandKind, allowedExitCodes: Set<Int32>?, byteLimit: Int) async throws -> Data {
+        try await base.runData(arguments, kind: kind, allowedExitCodes: allowedExitCodes, byteLimit: byteLimit)
+    }
+
     public func run(_ arguments: [String], kind: GitCommandKind, allowedExitCodes: Set<Int32>?, onProgress: @escaping @Sendable (String) -> Void) async throws -> String {
         let command = NetworkCommand.classify(arguments)
         guard command != .none else {

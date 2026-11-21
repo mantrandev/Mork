@@ -445,9 +445,9 @@ struct CommitInlineDetail: View {
                 .foregroundStyle(Palette.Text.secondary.color)
                 .lineLimit(1)
                 .frame(height: Metrics.CommitDetails.inlineLineHeight)
-        case let .large(lines):
+        case let .large(size):
             HStack(spacing: Metrics.Spacing.s) {
-                Text("This diff has \(lines.formatted()) lines.")
+                Text("This diff has \(size).")
                     .foregroundStyle(Palette.Text.secondary.color)
                 if let open {
                     Button("Open in Changes", action: open)

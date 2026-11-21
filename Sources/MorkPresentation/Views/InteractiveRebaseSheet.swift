@@ -429,10 +429,10 @@ private struct RebaseChangesDiff: View {
         case let .failed(message):
             EmptyStateView("Could Not Load", systemImage: "exclamationmark.triangle", message: message)
         case let .loaded(document):
-            if document.lines.isEmpty {
+            if document.isCollapsed {
+                LargeDiffPlaceholder(size: document.sizeSummary, show: session.showLargeChangesDiff)
+            } else if document.lines.isEmpty {
                 EmptyStateView("No Differences", systemImage: "equal")
-            } else if document.isCollapsed {
-                LargeDiffPlaceholder(lineCount: document.totalLines, show: session.showLargeChangesDiff)
             } else if case let .file(header, meta, additions, deletions)? = document.blocks.first, document.blocks.dropFirst().allSatisfy({ if case .file = $0 { false } else { true } }) {
                 let options = session.diffSettings
                 VStack(spacing: 0) {

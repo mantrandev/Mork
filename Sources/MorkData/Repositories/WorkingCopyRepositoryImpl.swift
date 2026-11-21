@@ -60,7 +60,7 @@ public final class WorkingCopyRepositoryImpl: WorkingCopyRepositoryProtocol {
     public func amendDiff(for change: FileChange) async throws -> String {
         guard let base = try await amendBase() else { return try await diff(for: change, staged: true) }
         let options = diffOptions.diffOptions().workingCopyArguments
-        return try await executor.readLossless([Self.literalPathspecs, "diff"] + options + ["--cached", base, "--", change.path])
+        return try await executor.readDiff([Self.literalPathspecs, "diff"] + options + ["--cached", base, "--", change.path])
     }
 
     public func unstageFromAmend(paths: [String]) async throws {
@@ -78,13 +78,13 @@ public final class WorkingCopyRepositoryImpl: WorkingCopyRepositoryProtocol {
     public func diff(for change: FileChange, staged: Bool) async throws -> String {
         let options = diffOptions.diffOptions().workingCopyArguments
         if staged {
-            return try await executor.readLossless([Self.literalPathspecs, "diff"] + options + ["--cached", "--", change.path])
+            return try await executor.readDiff([Self.literalPathspecs, "diff"] + options + ["--cached", "--", change.path])
         }
         if change.isIgnored, change.path.hasSuffix("/") { return "" }
         if change.isUntracked || change.isIgnored {
-            return try await executor.readLossless(["diff"] + options + ["--no-index", "--", "/dev/null", change.path], allowedExitCodes: [0, 1])
+            return try await executor.readDiff(["diff"] + options + ["--no-index", "--", "/dev/null", change.path], allowedExitCodes: [0, 1])
         }
-        return try await executor.readLossless([Self.literalPathspecs, "diff"] + options + ["--", change.path])
+        return try await executor.readDiff([Self.literalPathspecs, "diff"] + options + ["--", change.path])
     }
 
     public func stage(paths: [String]) async throws {

@@ -22,10 +22,10 @@ public final class LocalChangesComparisonRepositoryImpl: LocalChangesComparisonR
 
     public func diff(since revision: String, file: CommitFileChange) async throws -> String {
         let paths = (file.originalPath.map { [$0] } ?? []) + [file.path]
-        return try await executor.readLossless(["--literal-pathspecs", "diff", "-M"] + diffOptions.diffOptions().arguments + [revision, "--"] + paths)
+        return try await executor.readDiff(["--literal-pathspecs", "diff", "-M"] + diffOptions.diffOptions().arguments + [revision, "--"] + paths)
     }
 
     public func untrackedDiff(path: String) async throws -> String {
-        try await executor.readLossless(["diff"] + diffOptions.diffOptions().arguments + ["--no-index", "--", "/dev/null", path], allowedExitCodes: [0, 1])
+        try await executor.readDiff(["diff"] + diffOptions.diffOptions().arguments + ["--no-index", "--", "/dev/null", path], allowedExitCodes: [0, 1])
     }
 }

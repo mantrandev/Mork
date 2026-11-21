@@ -28,7 +28,7 @@ struct InlineDiffView: View {
                 if let new = line.newNumber {
                     context.draw(Text(String(new)).font(font).foregroundStyle(colors.number), at: CGPoint(x: numberWidth * 2, y: middle), anchor: .trailing)
                 }
-                let text = DiffTabs.expand(line.text, changed: nil, width: document.tabWidth).text
+                let text = DiffTabs.expand(line.displayText, changed: nil, width: document.tabWidth).text
                 context.draw(Text(text).font(font).foregroundStyle(Palette.Text.primary.color), at: CGPoint(x: gutterWidth + Metrics.Spacing.s, y: middle), anchor: .leading)
             }
         }
@@ -36,7 +36,7 @@ struct InlineDiffView: View {
         .clipped()
         .accessibilityElement()
         .accessibilityAddTraits(.isStaticText)
-        .accessibilityValue(rows.map(\.text).joined(separator: "\n"))
+        .accessibilityValue(rows.map(\.displayText).joined(separator: "\n"))
     }
 }
 

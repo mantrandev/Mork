@@ -12,6 +12,7 @@ struct DiffLine: Identifiable, Equatable, Sendable {
 
     static let maxLines = 5000
     static let maxHighlightLength = 1000
+    static let maxDisplayLength = 10_000
 
     let id: Int
     let text: String
@@ -23,6 +24,12 @@ struct DiffLine: Identifiable, Equatable, Sendable {
     var source: DiffLineID? = nil
 
     var isFileHeader: Bool { kind == .meta && text.hasPrefix("diff ") }
+
+    var displayText: String {
+        guard text.utf8.count > Self.maxDisplayLength else { return text }
+        let prefix = text.prefix(Self.maxDisplayLength)
+        return prefix.endIndex == text.endIndex ? text : String(prefix) + "…"
+    }
 
     static func parse(_ patch: FilePatch, limit: Int? = maxLines) -> [DiffLine] {
         var rows = patch.header.map { ($0, Kind.meta, Int?.none, DiffLineID?.none) }
@@ -123,7 +130,8 @@ struct DiffLine: Identifiable, Equatable, Sendable {
             for offset in 0..<pairs {
                 let old = deletions + offset
                 let new = additions + offset
-                guard let ranges = WordDiff.changedRanges(Array(result[old].text.dropFirst()), Array(result[new].text.dropFirst())) else { continue }
+                let bound = DiffLine.maxHighlightLength + 1
+                guard let ranges = WordDiff.changedRanges(Array(result[old].text.dropFirst().prefix(bound)), Array(result[new].text.dropFirst().prefix(bound))) else { continue }
                 result[old].changed = ranges.old.map { ($0.lowerBound + 1)..<($0.upperBound + 1) }
                 result[new].changed = ranges.new.map { ($0.lowerBound + 1)..<($0.upperBound + 1) }
             }

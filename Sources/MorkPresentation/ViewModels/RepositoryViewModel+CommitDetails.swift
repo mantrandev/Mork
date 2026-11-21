@@ -22,7 +22,7 @@ struct InlineDiffs {
 struct CommitTabRow: Identifiable, Equatable {
     enum Detail: Equatable {
         case diff(DiffDocument)
-        case large(Int)
+        case large(String)
         case failed(String)
     }
 
@@ -36,7 +36,7 @@ struct CommitTabRow: Identifiable, Equatable {
         self.file = file
         self.isExpanded = isExpanded
         detail = switch isExpanded ? state : nil {
-        case let .loaded(document): document.isCollapsed ? .large(document.totalLines) : .diff(document)
+        case let .loaded(document): document.isCollapsed ? .large(document.sizeSummary) : .diff(document)
         case let .failed(message): .failed(message)
         case .loading, nil: nil
         }
@@ -129,7 +129,10 @@ extension RepositoryViewModel {
         if ready == nil, files.count > 1 {
             switch await commitDetailTask(for: commit).value {
             case let .success(detail): ready = detail
-            case let .failure(error): return files.reduce(into: [:]) { $0[$1.path] = .failed(error.localizedDescription) }
+            case let .failure(error):
+                guard case .outputTooLarge = error as? GitDomainError else {
+                    return files.reduce(into: [:]) { $0[$1.path] = .failed(error.localizedDescription) }
+                }
             }
         }
         if let ready {

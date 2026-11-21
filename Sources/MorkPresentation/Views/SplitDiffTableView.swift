@@ -117,7 +117,7 @@ struct SplitDiffTableView: NSViewRepresentable {
 
         private func columns(of line: DiffLine) -> Int {
             if let cached = columnCounts[line.id] { return cached }
-            let count = DiffTabs.columns(of: line.text, width: metrics.tabWidth)
+            let count = DiffTabs.columns(of: line.displayText, width: metrics.tabWidth)
             columnCounts[line.id] = count
             return count
         }
