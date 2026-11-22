@@ -1,5 +1,33 @@
 # Changelog
 
+## v0.0.8 (2026-11-22)
+
+### Memory and CPU
+
+- Closing a tab frees its repository. Before, the sidebar kept every closed tab's history and diffs in memory.
+- A hidden tab trims its history to the first 500 commits and drops its caches, and the same happens to every hidden tab when macOS reports low memory.
+- Jumping to an old tag or branch loads at most 5,000 commits, then selects the commit directly.
+- Diffs over 32 MB are no longer read; Mork shows a "too large" message instead. Large Diff also collapses diffs over 1 MB or with a line longer than 10,000 bytes, and diff caches are limited to 16 MB each.
+- Repositories with `core.fsmonitor` no longer refresh nonstop.
+- Changes to gitignored files, such as `node_modules`, `.build` or `DerivedData`, no longer start a refresh.
+- A write action refreshes once instead of twice, switching tabs cancels the previous tab's refresh, and auto fetch pauses while Mork is in the background.
+- Fast scrolling in History is lighter.
+
+### Command line
+
+- `mork status` and `mork commit` open the Changes view, `mork log` opens the history, and `mork log -- <file>` opens the history of one file.
+- `mork -C <folder>` runs as if started in that folder, `mork open [<path>]` opens a repository, and `mork --version` prints the version.
+
+### Commit
+
+- While amending, the staged list shows the last commit's files, and unstaging one takes it out of the amended commit.
+- The Amend toggle reloads only the change lists, so it is fast in large repositories. Unchecking it puts back the message from before when the filled message was not edited.
+- A subject longer than 72 characters no longer shows a warning.
+
+### Errors
+
+- When checkout, rebase or pull fails because of a skip-worktree or assume-unchanged file, the error names the file and offers Unhide Files.
+
 ## v0.0.7 (2026-11-11)
 
 ### Sidebar
