@@ -241,7 +241,7 @@ extension RepositoryViewModel {
     }
 
     private func loadedCommit(hash: String) -> Commit? {
-        presentation.historyIndex[hash].flatMap { historyRows.indices.contains($0) ? historyRows[$0].commit : nil }
+        presentation.historyIndex[hash].flatMap { historyRows.indices.contains($0) ? historyRows[$0].commit : nil } ?? presentation.hiddenCommit(hash)
     }
 
     private func loadedTip(of selection: SidebarSelection) -> Commit? {
