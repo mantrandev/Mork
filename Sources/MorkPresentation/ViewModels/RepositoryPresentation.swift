@@ -7,6 +7,7 @@ struct HistoryRowModel: Identifiable, Equatable, Sendable {
     let isHead: Bool
     let date: String
     let bisect: BisectBadgeKind?
+    var fold: MergeFold? = nil
 
     var id: String { graph.id }
     var commit: Commit { graph.commit }
@@ -16,12 +17,19 @@ struct HistoryRowModel: Identifiable, Equatable, Sendable {
         let options: HistoryOptions
         let bisect: BisectSession?
         let now: Date
+        let folds: MergeFolds?
 
-        init(remoteBranches: [Branch], options: HistoryOptions, bisect: BisectSession?, now: Date = Date()) {
+        init(remoteBranches: [Branch], options: HistoryOptions, bisect: BisectSession?, now: Date = Date(), folds: MergeFolds? = nil) {
             remotes = Set(remoteBranches.compactMap(\.remoteName))
             self.options = options
             self.bisect = bisect
             self.now = now
+            self.folds = folds
+        }
+
+        func fold(for commit: Commit) -> MergeFold? {
+            guard let folds, commit.isMerge else { return nil }
+            return MergeFold(isCollapsed: folds.collapsed.contains(commit.hash), hiddenCount: folds.hiddenCounts[commit.hash] ?? 0)
         }
 
         func badge(for commit: Commit) -> BisectBadgeKind? {
@@ -44,7 +52,7 @@ struct HistoryRowModel: Identifiable, Equatable, Sendable {
         models.reserveCapacity(rows.count)
         var missing: [(Int, GraphRow)] = []
         for row in rows {
-            if let model = known[row.id], model.graph == row {
+            if let model = known[row.id], model.graph == row, model.fold == context.fold(for: row.commit) {
                 models.append(model)
             } else {
                 missing.append((models.count, row))
@@ -67,10 +75,22 @@ struct HistoryRowModel: Identifiable, Equatable, Sendable {
                 labels: labels,
                 isHead: row.commit.refNames.contains { $0 == "HEAD" || $0.hasPrefix("HEAD -> ") },
                 date: CommitDateText.string(for: row.commit.date, now: context.now, calendar: calendar, locale: locale),
-                bisect: context.badge(for: row.commit)
+                bisect: context.badge(for: row.commit),
+                fold: context.fold(for: row.commit)
             )
         }
     }
+}
+
+struct MergeFold: Equatable, Sendable {
+    let isCollapsed: Bool
+    let hiddenCount: Int
+}
+
+struct MergeFolds: Equatable, Sendable {
+    var collapsed: Set<String> = []
+    var hiddenBy: [String: String] = [:]
+    var hiddenCounts: [String: Int] = [:]
 }
 
 struct BranchLists: Equatable, Sendable {
@@ -173,6 +193,8 @@ struct RepositoryPresentation: Sendable {
     var unstagedChanges: [FileChange] = []
     var conflictedChanges: [FileChange] = []
     var detachedHead: Commit?
+    var history: [GraphRow] = []
+    var folds = MergeFolds()
     var historyIndex: [String: Int] = [:]
     var rows: [HistoryRowModel] = []
     var graphLanes = 1
@@ -188,7 +210,8 @@ struct RepositoryPresentation: Sendable {
         changeListOptions: ChangeListOptions = ChangeListOptions(),
         ignored: [FileChange] = [],
         options: HistoryOptions,
-        sidebarOptions: SidebarOptions
+        sidebarOptions: SidebarOptions,
+        collapsedMerges: Set<String> = []
     ) -> (RepositoryPresentation, PresentationChanges) {
         let old = previous.snapshot
         var next = previous
@@ -207,10 +230,10 @@ struct RepositoryPresentation: Sendable {
             next.unstagedChanges = snapshot.changes.filter(\.hasWorktreeChanges)
             next.conflictedChanges = snapshot.changes.filter(\.isConflicted)
         }
-        let historyChanged = snapshot.history != old.history
+        let historyChanged = snapshot.history != old.history || collapsedMerges != previous.folds.collapsed
         if historyChanged || snapshot.historyCursor != old.historyCursor { changed.insert(.history) }
         if historyChanged {
-            next.historyIndex = Dictionary(snapshot.history.enumerated().map { ($1.commit.hash, $0) }) { first, _ in first }
+            next.collapse(collapsedMerges)
         }
         if historyChanged || changed.contains(.branches) {
             next.detachedHead = next.currentBranch == nil ? snapshot.history.first { $0.commit.refNames.contains("HEAD") }?.commit : nil
@@ -235,15 +258,27 @@ struct RepositoryPresentation: Sendable {
         }
         let labelOptions = HistoryOptions(hidesTags: options.hidesTags, hidesStashes: options.hidesStashes, hiddenBranches: options.hiddenBranches, filteredBranches: options.filteredBranches)
         if historyChanged || !changed.isDisjoint(with: [.branches, .bisect]) || labelOptions != previous.rowOptions {
-            let context = HistoryRowModel.Context(remoteBranches: next.remoteBranches, options: labelOptions, bisect: snapshot.bisect)
+            let context = HistoryRowModel.Context(remoteBranches: next.remoteBranches, options: labelOptions, bisect: snapshot.bisect, folds: next.folds)
             let reusable = changed.isDisjoint(with: [.branches, .bisect]) && labelOptions == previous.rowOptions
-            let rows = reusable ? HistoryRowModel.make(snapshot.history, reusing: previous.rows, context: context) : HistoryRowModel.make(snapshot.history, context: context)
+            let rows = reusable ? HistoryRowModel.make(next.history, reusing: previous.rows, context: context) : HistoryRowModel.make(next.history, context: context)
             if rows != previous.rows { changed.insert(.rows) }
             next.rows = rows
-            next.graphLanes = snapshot.history.map(\.width).max() ?? 1
+            next.graphLanes = next.history.map(\.width).max() ?? 1
             next.rowOptions = labelOptions
         }
         return (next, changed)
+    }
+
+    private mutating func collapse(_ merges: Set<String>) {
+        let collapsed = MergeCollapse.collapse(snapshot.history, merges: merges)
+        history = collapsed.rows
+        folds = MergeFolds(collapsed: merges, hiddenBy: collapsed.hiddenBy, hiddenCounts: collapsed.hiddenCounts)
+        historyIndex = Dictionary(history.enumerated().map { ($1.commit.hash, $0) }) { first, _ in first }
+    }
+
+    func hiddenCommit(_ hash: String) -> Commit? {
+        guard folds.hiddenBy[hash] != nil else { return nil }
+        return snapshot.history.first { $0.commit.hash == hash }?.commit
     }
 
     static func trimmingHistory(of snapshot: RepositorySnapshot, toCommits limit: Int) -> RepositorySnapshot? {
@@ -276,12 +311,11 @@ struct RepositoryPresentation: Sendable {
 
     func appending(_ page: HistoryPage, options: HistoryOptions) -> RepositoryPresentation {
         var next = self
-        let offset = snapshot.history.count
-        let history = snapshot.history + page.rows
+        let offset = history.count
         next.snapshot = RepositorySnapshot(
             branches: snapshot.branches,
             changes: snapshot.changes,
-            history: history,
+            history: snapshot.history + page.rows,
             stashes: snapshot.stashes,
             tags: snapshot.tags,
             state: snapshot.state,
@@ -291,10 +325,18 @@ struct RepositoryPresentation: Sendable {
             bisect: snapshot.bisect,
             historyCursor: page.cursor
         )
+        guard folds.collapsed.isEmpty else {
+            next.collapse(folds.collapsed)
+            let context = HistoryRowModel.Context(remoteBranches: remoteBranches, options: options, bisect: snapshot.bisect, folds: next.folds)
+            next.rows = HistoryRowModel.make(next.history, reusing: rows, context: context)
+            next.graphLanes = next.history.map(\.width).max() ?? 1
+            return next
+        }
+        next.history = history + page.rows
         for (index, row) in page.rows.enumerated() where next.historyIndex[row.commit.hash] == nil {
             next.historyIndex[row.commit.hash] = offset + index
         }
-        let context = HistoryRowModel.Context(remoteBranches: remoteBranches, options: options, bisect: snapshot.bisect)
+        let context = HistoryRowModel.Context(remoteBranches: remoteBranches, options: options, bisect: snapshot.bisect, folds: folds)
         next.rows = rows + HistoryRowModel.make(page.rows, context: context)
         next.graphLanes = max(graphLanes, page.rows.map(\.width).max() ?? 1)
         return next

@@ -58,7 +58,7 @@ public enum CommitGraphLayout {
         return layout(commits, lanes: &lanes)
     }
 
-    public static func layout(_ commits: [Commit], lanes: inout [String?]) -> [GraphRow] {
+    public static func layout(_ commits: [Commit], lanes: inout [String?], hiding hidden: Set<String> = []) -> [GraphRow] {
         var rows: [GraphRow] = []
         rows.reserveCapacity(commits.count)
 
@@ -73,12 +73,13 @@ public enum CommitGraphLayout {
             for index in lanes.indices where lanes[index] == commit.hash {
                 lanes[index] = nil
             }
+            let parents = hidden.isEmpty ? commit.parents : commit.parents.filter { !hidden.contains($0) }
             var targets = Set<Int>()
-            if let first = commit.parents.first {
+            if let first = parents.first {
                 lanes[column] = first
                 targets.insert(column)
             }
-            for parent in commit.parents.dropFirst() {
+            for parent in parents.dropFirst() {
                 targets.insert(lanes.firstIndex(of: parent) ?? open(parent, in: &lanes))
             }
             while lanes.last == .some(nil) {

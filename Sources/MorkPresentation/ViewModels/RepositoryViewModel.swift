@@ -312,6 +312,8 @@ public final class RepositoryViewModel {
     private var pendingReads = 0
     @ObservationIgnored let filterDebounce: Duration
     @ObservationIgnored var presentation = RepositoryPresentation()
+    @ObservationIgnored var collapsedMerges: Set<String> = []
+    @ObservationIgnored var mergeRevealTask: Task<Void, Never>?
     @ObservationIgnored var presentationVersion = 0
     @ObservationIgnored var sidebarTask: Task<Void, Never>?
     @ObservationIgnored private var refreshLoop: Task<Void, Never>?
@@ -504,8 +506,9 @@ public final class RepositoryViewModel {
             let ignored = changeListOptions.showsIgnored ? ignoredChanges : []
             let options = historyOptions
             let sidebarOptions = sidebarOptions
+            let collapsedMerges = collapsedMerges
             let (next, changed) = await Task.detached(priority: .userInitiated) {
-                RepositoryPresentation.present(snapshot, after: previous, branchFilter: branchFilter, changesFilter: changesFilter, changeListOptions: changeListOptions, ignored: ignored, options: options, sidebarOptions: sidebarOptions)
+                RepositoryPresentation.present(snapshot, after: previous, branchFilter: branchFilter, changesFilter: changesFilter, changeListOptions: changeListOptions, ignored: ignored, options: options, sidebarOptions: sidebarOptions, collapsedMerges: collapsedMerges)
             }.value
             guard !Task.isCancelled else { return }
             guard version == presentationVersion else { continue }
@@ -531,7 +534,7 @@ public final class RepositoryViewModel {
             conflictedChanges = next.conflictedChanges
             scheduleLFSMarkers()
         }
-        if changed.contains(.history) { historyRows = snapshot.history }
+        if changed.contains(.history) { historyRows = next.history }
         if detachedHead != next.detachedHead { detachedHead = next.detachedHead }
         if changed.contains(.stashes) { stashes = snapshot.stashes }
         if changed.contains(.tags) {

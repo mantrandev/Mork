@@ -67,12 +67,25 @@ extension RepositoryViewModel {
 
     func reveal(_ commit: Commit) {
         selection = .commit(commit)
-        scrollRequest = ScrollRequest(id: (scrollRequest?.id ?? 0) + 1, hash: commit.hash)
+        guard presentation.folds.hiddenBy[commit.hash] != nil else {
+            requestScroll(to: commit.hash)
+            return
+        }
+        mergeRevealTask?.cancel()
+        mergeRevealTask = Task { [weak self] in
+            guard let self else { return }
+            await self.expandMerges(hiding: commit.hash)
+            if !Task.isCancelled, self.selectedCommit?.hash == commit.hash { self.requestScroll(to: commit.hash) }
+        }
+    }
+
+    private func requestScroll(to hash: String) {
+        scrollRequest = ScrollRequest(id: (scrollRequest?.id ?? 0) + 1, hash: hash)
     }
 
     func isKnown(_ commit: Commit) -> Bool {
         let hash = commit.hash
-        if presentation.historyIndex[hash] != nil { return true }
+        if presentation.historyIndex[hash] != nil || presentation.folds.hiddenBy[hash] != nil { return true }
         if search.results?.contains(where: { $0.commit.hash == hash }) == true { return true }
         if case let .loaded(entries) = reflog, entries.contains(where: { $0.commit.hash == hash }) { return true }
         return false

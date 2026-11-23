@@ -287,6 +287,12 @@ enum Metrics {
         static let maxHeight: CGFloat = 360
     }
 
+    enum MergePreview {
+        static let width: CGFloat = 380
+        static let maxHeight: CGFloat = 320
+        static let hashWidth: CGFloat = 60
+    }
+
     enum Badge {
         static let iconFont: CGFloat = 8.5
         static let iconCellWidth: CGFloat = 16

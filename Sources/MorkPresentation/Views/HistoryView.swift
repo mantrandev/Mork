@@ -250,6 +250,11 @@ struct HistoryView: View {
         Button("Compare to Local Changes") { comparison = viewModel.compareToLocalChanges(commit) }
             .accessibilityIdentifier("history.compareToLocal")
         Divider()
+        if commit.isMerge, !viewModel.isSearchActive {
+            Button(viewModel.isMergeCollapsed(commit) ? "Expand Merged Commits" : "Collapse Merged Commits") { Task { await viewModel.toggleMergeCollapse(commit) } }
+                .accessibilityIdentifier("history.toggleMergeFold")
+            Divider()
+        }
         Button("Copy Commit SHA") { copy(commit.hash) }
             .keyboardShortcut("c", modifiers: .command)
             .accessibilityIdentifier("history.copySHA")
@@ -460,6 +465,15 @@ private struct CommitRow: View, Equatable {
                 CommitGraphView(row: row, isHead: isHead)
                     .frame(width: graphWidth, alignment: .leading)
                     .clipped()
+                    .overlay(alignment: .leading) {
+                        if let fold = model.fold, CommitGraphGeometry.x(row.column) < graphWidth {
+                            MergeFoldButton(commit: commit, fold: fold, lane: row.column, style: .node, viewModel: menus.viewModel)
+                                .offset(x: CommitGraphGeometry.x(row.column) - Metrics.HitTarget.inline / 2)
+                        }
+                    }
+                if let fold = model.fold, fold.isCollapsed, fold.hiddenCount > 0 {
+                    MergeFoldButton(commit: commit, fold: fold, lane: row.column, style: .badge, viewModel: menus.viewModel)
+                }
                 if commit.syncStatus != .shared {
                     Circle()
                         .fill(commit.syncStatus == .localOnly ? Palette.Status.modified.ink.color : Palette.Text.secondary.color)
