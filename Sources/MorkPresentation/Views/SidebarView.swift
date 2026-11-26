@@ -63,6 +63,7 @@ struct SidebarView: View {
             .overlayScrollers(hidesFocusRing: true)
             .environment(\.sidebarRowSize, .small)
             .environment(\.defaultMinListRowHeight, Metrics.Row.sidebar)
+            .revealWhenLoaded(viewModel.hasLoaded, hidesWhileLoading: true)
             .accessibilityIdentifier("sidebar")
         }
         .workspacePrompts(viewModel: viewModel, sheet: $workspaceSheet, confirmation: $workspaceConfirmation, onOpenRepository: onOpenRepository)

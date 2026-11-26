@@ -588,6 +588,7 @@ private struct RepositoryDetail: View {
                 .background(PaneFocusReset(pane: viewModel.pane))
             }
         }
+        .revealWhenLoaded(viewModel.hasLoaded, hidesWhileLoading: false)
     }
 
     private func commitBrowser<Content: View>(@ViewBuilder list: () -> Content) -> some View {
@@ -609,8 +610,32 @@ private struct RepositoryDetail: View {
     }
 }
 
+private struct RevealWhenLoaded: ViewModifier {
+    let isLoaded: Bool
+    let hidesWhileLoading: Bool
+    @State private var isRevealed = false
+
+    func body(content: Content) -> some View {
+        content
+            .opacity(isRevealed || !(isLoaded || hidesWhileLoading) ? 1 : 0)
+            .onAppear { isRevealed = isLoaded }
+            .onChange(of: isLoaded) {
+                withAnimation(Metrics.RepositoryTab.reveal) { isRevealed = isLoaded }
+            }
+    }
+}
+
+extension View {
+    func revealWhenLoaded(_ isLoaded: Bool, hidesWhileLoading: Bool) -> some View {
+        modifier(RevealWhenLoaded(isLoaded: isLoaded, hidesWhileLoading: hidesWhileLoading))
+    }
+}
+
 private struct RepositoryLoadingView: View {
+    static let revealDelay: Duration = .milliseconds(400)
+
     let name: String
+    @State private var isRevealed = false
 
     var body: some View {
         VStack(spacing: Metrics.Spacing.s) {
@@ -620,9 +645,14 @@ private struct RepositoryLoadingView: View {
                 .font(Metrics.Font.body)
                 .foregroundStyle(Palette.Text.secondary.color)
         }
+        .opacity(isRevealed ? 1 : 0)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .accessibilityElement(children: .combine)
         .accessibilityIdentifier("repository.loading")
+        .task {
+            try? await Task.sleep(for: Self.revealDelay)
+            isRevealed = true
+        }
     }
 }
 
