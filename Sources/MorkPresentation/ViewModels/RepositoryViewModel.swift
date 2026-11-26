@@ -151,6 +151,13 @@ public final class RepositoryViewModel {
     public private(set) var isLoading = false
     public internal(set) var isLocating = false
     public private(set) var operations: Set<Operation> = []
+    public private(set) var checkingOutBranch: String?
+    public private(set) var checkoutProgress = GitProgressLog()
+    public var checkoutStatus: String? {
+        guard let checkingOutBranch else { return nil }
+        let status = "Switching to \(checkingOutBranch)…"
+        return checkoutProgress.percent.map { "\(status) \($0)%" } ?? status
+    }
     public var pane: Pane = .changes {
         didSet { if pane != .history, sidebarItem != nil { sidebarItem = nil } }
     }
@@ -762,7 +769,19 @@ public final class RepositoryViewModel {
             await onOpenWorktree(worktree)
             return
         }
-        await perform { try await $0.checkoutBranch.execute(branch: branch) }
+        guard checkingOutBranch == nil else { return }
+        checkingOutBranch = localName
+        checkoutProgress = GitProgressLog()
+        defer { checkingOutBranch = nil }
+        let (lines, continuation) = AsyncStream<String>.makeStream()
+        let reader = Task {
+            for await line in lines { self.checkoutProgress.append(line) }
+        }
+        await perform { dependencies in
+            defer { continuation.finish() }
+            try await dependencies.checkoutBranch.execute(branch: branch) { continuation.yield($0) }
+        }
+        await reader.value
     }
 
     public func delete(_ branch: Branch, force: Bool, alsoDeleteRemote: Bool = false) async {

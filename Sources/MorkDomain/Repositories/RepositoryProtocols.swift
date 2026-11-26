@@ -40,8 +40,8 @@ public protocol HistoryRepositoryProtocol: Sendable {
 public protocol BranchRepositoryProtocol: Sendable {
     func branches() async throws -> [Branch]
     func create(named name: String) async throws
-    func switchTo(_ branch: Branch) async throws
-    func track(_ remoteBranch: Branch) async throws
+    func switchTo(_ branch: Branch, progress: @escaping @Sendable (String) -> Void) async throws
+    func track(_ remoteBranch: Branch, progress: @escaping @Sendable (String) -> Void) async throws
     func delete(_ branch: Branch, force: Bool) async throws
     func merge(_ branch: Branch) async throws
 }

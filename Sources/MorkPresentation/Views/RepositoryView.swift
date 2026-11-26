@@ -734,7 +734,7 @@ private struct RepositoryPicker: View {
                         Image(systemName: viewModel.isDetachedHead ? "exclamationmark.triangle.fill" : "arrow.triangle.branch")
                             .font(Metrics.Font.label)
                             .foregroundStyle(viewModel.isDetachedHead ? Palette.Status.conflict.ink.color : Palette.Text.secondary.color)
-                        Text(viewModel.headTitle)
+                        Text(viewModel.checkoutStatus ?? viewModel.headTitle)
                             .font(Metrics.Font.caption)
                             .truncationMode(.middle)
                         Group {
@@ -770,7 +770,7 @@ private struct RepositoryPicker: View {
         .background(DropdownAnchorView(panel: dropdown))
         .help("Check out a branch")
         .accessibilityLabel("\(viewModel.name), \(viewModel.headTitle)")
-        .accessibilityValue(viewModel.showsActivity ? "busy" : "")
+        .accessibilityValue(viewModel.checkoutStatus ?? (viewModel.showsActivity ? "busy" : ""))
         .accessibilityIdentifier("toolbar.branchPicker")
         .onChange(of: viewModel.branchPickerRequest) {
             if opensOnRequest, !dropdown.isShown { showMenu() }
