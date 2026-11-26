@@ -78,15 +78,13 @@ struct RepositoryView: View {
             .sheet(item: $viewModel.statistics) { StatisticsSheet(session: $0) }
         }
         .ignoresSafeArea(.container, edges: .top)
-        .navigationTitle(viewModel.name)
-        .navigationSubtitle(viewModel.headTitle)
         .onGeometryChange(for: CGFloat.self, of: { $0.size.width }, action: windowWidthChanged)
         .background {
             if showsOverlaySidebar {
                 SidebarSelectionObserver(viewModel: viewModel, onChange: dismissOverlaySidebar)
             }
         }
-        .background(TrafficLightsCentering())
+        .background(TrafficLightsCentering(title: viewModel.name, subtitle: viewModel.headTitle))
         .background(FilePreviewHost(viewModel: viewModel))
         .background(CommitPreviewHost(viewModel: viewModel))
         .background(ConflictWindowHost(viewModel: viewModel))
@@ -199,11 +197,15 @@ struct AdaptiveSidebar: Equatable {
 }
 
 struct TrafficLightsCentering: NSViewRepresentable {
+    var title: String?
+    var subtitle: String?
+
     func makeNSView(context: Context) -> Observer {
         Observer()
     }
 
     func updateNSView(_ view: Observer, context: Context) {
+        if let title, let subtitle { view.setTitle(title, subtitle: subtitle) }
         view.center()
     }
 
@@ -218,11 +220,25 @@ struct TrafficLightsCentering: NSViewRepresentable {
             for name in [NSWindow.didResizeNotification, NSWindow.didEndLiveResizeNotification, NSWindow.didExitFullScreenNotification, NSWindow.didBecomeKeyNotification, NSWindow.didResignKeyNotification, NSWindow.didUpdateNotification] {
                 NotificationCenter.default.addObserver(self, selector: #selector(scheduleCenter), name: name, object: window)
             }
+            let close = window.standardWindowButton(.closeButton)
+            let controls = [NSWindow.ButtonType.closeButton, .miniaturizeButton, .zoomButton].compactMap { window.standardWindowButton($0) }
+            for view in controls + [close?.superview, close?.superview?.superview].compactMap({ $0 }) {
+                view.postsFrameChangedNotifications = true
+                NotificationCenter.default.addObserver(self, selector: #selector(center), name: NSView.frameDidChangeNotification, object: view)
+            }
             DispatchQueue.main.async { [weak self] in self?.center() }
         }
 
         override func layout() {
             super.layout()
+            center()
+        }
+
+        func setTitle(_ title: String, subtitle: String) {
+            guard let window, window.title != title || window.subtitle != subtitle else { return }
+            window.title = title
+            window.subtitle = subtitle
+            window.standardWindowButton(.closeButton)?.superview?.superview?.layoutSubtreeIfNeeded()
             center()
         }
 
@@ -254,9 +270,13 @@ struct TrafficLightsCentering: NSViewRepresentable {
                 guard let button = window.standardWindowButton(kind) else { continue }
                 if standardButtonOrigins[kind] == nil { standardButtonOrigins[kind] = button.frame.minX }
             }
-            for (button, origin) in targetOrigins() where button.frame.origin != origin {
-                button.setFrameOrigin(origin)
+            CATransaction.begin()
+            CATransaction.setDisableActions(true)
+            for (button, origin) in targetOrigins() {
+                if button.frame.origin != origin { button.setFrameOrigin(origin) }
+                button.layer?.removeAllAnimations()
             }
+            CATransaction.commit()
         }
     }
 }
@@ -588,6 +608,7 @@ private struct RepositoryDetail: View {
                 .background(PaneFocusReset(pane: viewModel.pane))
             }
         }
+        .revealWhenLoaded(viewModel.hasLoaded, hidesWhileLoading: false)
     }
 
     private func commitBrowser<Content: View>(@ViewBuilder list: () -> Content) -> some View {
@@ -609,8 +630,32 @@ private struct RepositoryDetail: View {
     }
 }
 
+private struct RevealWhenLoaded: ViewModifier {
+    let isLoaded: Bool
+    let hidesWhileLoading: Bool
+    @State private var isRevealed = false
+
+    func body(content: Content) -> some View {
+        content
+            .opacity(isRevealed || !(isLoaded || hidesWhileLoading) ? 1 : 0)
+            .onAppear { isRevealed = isLoaded }
+            .onChange(of: isLoaded) {
+                withAnimation(Metrics.RepositoryTab.reveal) { isRevealed = isLoaded }
+            }
+    }
+}
+
+extension View {
+    func revealWhenLoaded(_ isLoaded: Bool, hidesWhileLoading: Bool) -> some View {
+        modifier(RevealWhenLoaded(isLoaded: isLoaded, hidesWhileLoading: hidesWhileLoading))
+    }
+}
+
 private struct RepositoryLoadingView: View {
+    static let revealDelay: Duration = .milliseconds(400)
+
     let name: String
+    @State private var isRevealed = false
 
     var body: some View {
         VStack(spacing: Metrics.Spacing.s) {
@@ -620,9 +665,14 @@ private struct RepositoryLoadingView: View {
                 .font(Metrics.Font.body)
                 .foregroundStyle(Palette.Text.secondary.color)
         }
+        .opacity(isRevealed ? 1 : 0)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .accessibilityElement(children: .combine)
         .accessibilityIdentifier("repository.loading")
+        .task {
+            try? await Task.sleep(for: Self.revealDelay)
+            isRevealed = true
+        }
     }
 }
 
@@ -734,7 +784,7 @@ private struct RepositoryPicker: View {
                         Image(systemName: viewModel.isDetachedHead ? "exclamationmark.triangle.fill" : "arrow.triangle.branch")
                             .font(Metrics.Font.label)
                             .foregroundStyle(viewModel.isDetachedHead ? Palette.Status.conflict.ink.color : Palette.Text.secondary.color)
-                        Text(viewModel.headTitle)
+                        Text(viewModel.checkoutStatus ?? viewModel.headTitle)
                             .font(Metrics.Font.caption)
                             .truncationMode(.middle)
                         Group {
@@ -770,7 +820,7 @@ private struct RepositoryPicker: View {
         .background(DropdownAnchorView(panel: dropdown))
         .help("Check out a branch")
         .accessibilityLabel("\(viewModel.name), \(viewModel.headTitle)")
-        .accessibilityValue(viewModel.showsActivity ? "busy" : "")
+        .accessibilityValue(viewModel.checkoutStatus ?? (viewModel.showsActivity ? "busy" : ""))
         .accessibilityIdentifier("toolbar.branchPicker")
         .onChange(of: viewModel.branchPickerRequest) {
             if opensOnRequest, !dropdown.isShown { showMenu() }

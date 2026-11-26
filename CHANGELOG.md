@@ -1,5 +1,22 @@
 # Changelog
 
+## v0.0.9 (2026-11-26)
+
+### History
+
+- Click a merge ring to hide the commits that merge brought in. A `› N commits` badge marks the folded merge; click it or the ring again to bring the rows back.
+- Hover a merge ring or its badge for a preview of the merged commits.
+
+### Checkout
+
+- While a branch checkout runs, the branch button shows `Switching to <branch>…` with the percent from Git, including Git LFS downloads.
+- A second checkout started before the first one finishes is ignored.
+
+### Tabs
+
+- A newly opened tab, such as a worktree, fades in once loaded instead of showing an empty sidebar first. "Loading…" appears only when loading takes longer than 0.4 s.
+- The window buttons no longer jump when a tab opens or the window title changes.
+
 ## v0.0.8 (2026-11-22)
 
 ### Memory and CPU

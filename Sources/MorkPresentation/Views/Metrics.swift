@@ -19,6 +19,7 @@ enum Metrics {
         static let expandedMinimumWidth: CGFloat = 240
         static let expandedMaximumWidth: CGFloat = 360
         static let titleAccessoryWidth: CGFloat = 100
+        static let reveal = Animation.easeOut(duration: 0.18)
     }
 
     enum Opacity {

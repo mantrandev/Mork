@@ -3,7 +3,7 @@ import MorkDomain
 extension HistoryRepositoryImpl {
     func markingSyncStatus(_ commits: [Commit]) async throws -> [Commit] {
         guard !commits.isEmpty else { return commits }
-        return try await markingSyncStatus(commits, branches: BranchRepositoryImpl(executor: executor).branches())
+        return try await markingSyncStatus(commits, branches: BranchRepositoryImpl.branches(using: executor))
     }
 
     public func markingSyncStatus(_ commits: [Commit], branches: [Branch]) async throws -> [Commit] {
