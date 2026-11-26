@@ -78,15 +78,13 @@ struct RepositoryView: View {
             .sheet(item: $viewModel.statistics) { StatisticsSheet(session: $0) }
         }
         .ignoresSafeArea(.container, edges: .top)
-        .navigationTitle(viewModel.name)
-        .navigationSubtitle(viewModel.headTitle)
         .onGeometryChange(for: CGFloat.self, of: { $0.size.width }, action: windowWidthChanged)
         .background {
             if showsOverlaySidebar {
                 SidebarSelectionObserver(viewModel: viewModel, onChange: dismissOverlaySidebar)
             }
         }
-        .background(TrafficLightsCentering())
+        .background(TrafficLightsCentering(title: viewModel.name, subtitle: viewModel.headTitle))
         .background(FilePreviewHost(viewModel: viewModel))
         .background(CommitPreviewHost(viewModel: viewModel))
         .background(ConflictWindowHost(viewModel: viewModel))
@@ -199,11 +197,15 @@ struct AdaptiveSidebar: Equatable {
 }
 
 struct TrafficLightsCentering: NSViewRepresentable {
+    var title: String?
+    var subtitle: String?
+
     func makeNSView(context: Context) -> Observer {
         Observer()
     }
 
     func updateNSView(_ view: Observer, context: Context) {
+        if let title, let subtitle { view.setTitle(title, subtitle: subtitle) }
         view.center()
     }
 
@@ -218,11 +220,25 @@ struct TrafficLightsCentering: NSViewRepresentable {
             for name in [NSWindow.didResizeNotification, NSWindow.didEndLiveResizeNotification, NSWindow.didExitFullScreenNotification, NSWindow.didBecomeKeyNotification, NSWindow.didResignKeyNotification, NSWindow.didUpdateNotification] {
                 NotificationCenter.default.addObserver(self, selector: #selector(scheduleCenter), name: name, object: window)
             }
+            let close = window.standardWindowButton(.closeButton)
+            let controls = [NSWindow.ButtonType.closeButton, .miniaturizeButton, .zoomButton].compactMap { window.standardWindowButton($0) }
+            for view in controls + [close?.superview, close?.superview?.superview].compactMap({ $0 }) {
+                view.postsFrameChangedNotifications = true
+                NotificationCenter.default.addObserver(self, selector: #selector(center), name: NSView.frameDidChangeNotification, object: view)
+            }
             DispatchQueue.main.async { [weak self] in self?.center() }
         }
 
         override func layout() {
             super.layout()
+            center()
+        }
+
+        func setTitle(_ title: String, subtitle: String) {
+            guard let window, window.title != title || window.subtitle != subtitle else { return }
+            window.title = title
+            window.subtitle = subtitle
+            window.standardWindowButton(.closeButton)?.superview?.superview?.layoutSubtreeIfNeeded()
             center()
         }
 
@@ -254,9 +270,13 @@ struct TrafficLightsCentering: NSViewRepresentable {
                 guard let button = window.standardWindowButton(kind) else { continue }
                 if standardButtonOrigins[kind] == nil { standardButtonOrigins[kind] = button.frame.minX }
             }
-            for (button, origin) in targetOrigins() where button.frame.origin != origin {
-                button.setFrameOrigin(origin)
+            CATransaction.begin()
+            CATransaction.setDisableActions(true)
+            for (button, origin) in targetOrigins() {
+                if button.frame.origin != origin { button.setFrameOrigin(origin) }
+                button.layer?.removeAllAnimations()
             }
+            CATransaction.commit()
         }
     }
 }
